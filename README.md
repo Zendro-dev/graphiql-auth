@@ -15,7 +15,7 @@ Example:
 
 `REACT_APP_MY_SERVER_URL="http://localhost:3000" npm start`
 
-
+NOTE: The app will be running at the port `7000`. This is intended to be changed so the user can pass this port as a parameter.
 
 
 ## Available Scripts
