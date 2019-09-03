@@ -10,13 +10,13 @@ class Login extends Component {
       email: "",
       password: ""
     }
+
+    this.login_url = process.env.REACT_APP_LOGIN_URL || 'http://localhost:3000/login';
   }
 
   fetchlogin = () => {
 
-    console.log("DATA FOR LOGIN");
-    console.log(JSON.stringify({email: this.state.email, password: this.state.password }));
-    return axios({url: process.env.REACT_APP_MY_SERVER_URL+ "/login",
+    return axios({url: this.login_url,
       method: 'POST',
       data: {email: this.state.email, password: this.state.password }
     });

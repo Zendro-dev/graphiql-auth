@@ -11,6 +11,7 @@ class MyGraphiQL extends React.Component {
     this.state = {
       isLoggedIn: true
     }
+    this.server_url = process.env.REACT_APP_SERVER_URL || 'http://localhost:3000/graphql';
   }
 
 
@@ -30,7 +31,7 @@ class MyGraphiQL extends React.Component {
       return;
     }
 
-   return fetch(process.env.REACT_APP_MY_SERVER_URL+ "/graphql", {
+   return fetch(this.server_url, {
      method: 'post',
      headers: headers,
      body: JSON.stringify(graphQLParams),

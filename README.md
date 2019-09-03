@@ -7,13 +7,16 @@ You can find the most recent version of this guide [here](https://github.com/fac
 
 ### Usage
 
-In order to run this SPA an environmental variable `REACT_APP_MY_SERVER_URL` is required.
 
-`REACT_APP_MY_SERVER_URL` indicates the server url where a grapql API is being served.
+In order to run this SPA two environmental variables are expected:
 
-Example: 
+`REACT_APP_SERVER_URL` : indicates the server url where a graphql API is being served. Default value is `http://localhost:3000/graphql`.
 
-`REACT_APP_MY_SERVER_URL="http://localhost:3000" npm start`
+`REACT_APP_LOGIN_URL`: indicates the url where the SPA will fetch for login authentication. Default value is `http://localhost:3000/login`.
+
+Example:
+
+`REACT_APP_SERVER_URL="http://my.server.something" npm start`
 
 NOTE: The app will be running at the port `7000`. This is intended to be changed so the user can pass this port as a parameter.
 
@@ -51,5 +54,3 @@ If you aren’t satisfied with the build tool and configuration choices, you can
 Instead, it will copy all the configuration files and the transitive dependencies (Webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
 
 You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
-
-
