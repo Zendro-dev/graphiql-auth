@@ -8,17 +8,19 @@ You can find the most recent version of this guide [here](https://github.com/fac
 ### Usage
 
 
-In order to run this SPA two environmental variables are expected:
+In order to run this SPA three environmental variables are expected:
 
-`REACT_APP_SERVER_URL` : indicates the server url where a graphql API is being served. Default value is `http://localhost:3000/graphql`.
+`REACT_APP_SERVER_URL`: indicates the server url where a graphql API is being served. Default value is `http://localhost:3000/graphql`.
 
 `REACT_APP_LOGIN_URL`: indicates the url where the SPA will fetch for login authentication. Default value is `http://localhost:3000/login`.
 
+`PORT`:   for dev mode, this variable allows to modify the port where the app will be listening. Default value is 7000.
+
 Example:
 
-`REACT_APP_SERVER_URL="http://my.server.something" npm start`
+`REACT_APP_SERVER_URL="http://my.server.url" REACT_APP_LOGIN_URL="http://my.login.url" PORT=9000 npm start`
 
-NOTE: The app will be running at the port `7000`. This is intended to be changed so the user can pass this port as a parameter.
+In this case the app will be listening at PORT 9000, it will check login authentication at `http://my.login.url` and will connect to backend runing at  `http://my.server.url`.
 
 
 ## Available Scripts
