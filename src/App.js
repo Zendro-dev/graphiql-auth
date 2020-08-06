@@ -21,7 +21,7 @@ class App extends Component {
 
       { this.state.isLoggedIn ?
 
-        <div style={{height: "100vh"}}>
+        <div style={{height: "100vh", overflow:'hidden'}}>
           <button className="btn btn-primary" onClick={this.loggedHandler.bind(this, false)} > Logout</button>
           <MyGraphiQL loginHandler={this.loggedHandler}/>
         </div>
