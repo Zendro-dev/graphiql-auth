@@ -1,15 +1,16 @@
 import React, {useState, useEffect, useCallback, useRef} from 'react';
-import ReactJson from 'react-json-view'
-import clsx from 'clsx';
-import { makeStyles, ThemeProvider } from '@material-ui/core/styles';
-import Card from '@material-ui/core/Card';
-import CardActions from '@material-ui/core/CardActions';
-import CardContent from '@material-ui/core/CardContent';
+import { makeStyles } from '@material-ui/core/styles';
 import Button from '@material-ui/core/Button';
 import Typography from '@material-ui/core/Typography';
 import Grid from '@material-ui/core/Grid';
-import Input from '@material-ui/core/Input';
 import Box from '@material-ui/core/Box';
+import Radio from '@material-ui/core/Radio';
+import RadioGroup from '@material-ui/core/RadioGroup';
+import FormControlLabel from '@material-ui/core/FormControlLabel';
+import FormControl from '@material-ui/core/FormControl';
+import Fab from '@material-ui/core/Fab';
+import PlayArrowIcon from '@material-ui/icons/PlayArrow';
+import CloseIcon from '@material-ui/icons/Close';
 import CodeMirror from 'react-codemirror';
 import 'codemirror/lib/codemirror.css';
 import 'codemirror/mode/javascript/javascript';
@@ -33,26 +34,11 @@ import 'codemirror/addon/lint/lint.css';
 import jsonlint from "jsonlint-mod";
 window.jsonlint = jsonlint;
 
-export const defaultMetaQueryInputHeight = 300;
-const minMetaQueryInputHeight = 100;
-const maxMetaQueryInputHeight = 500;
-
 const useStyles = makeStyles(theme => ({
-  root: {
-    minHeight: 100,
-  },
-  bullet: {
-    display: 'inline-block',
-    margin: '0 2px',
-    transform: 'scale(0.8)',
-  },
   title: {
-    fontSize: '14px',
-    fontWeight: 700,
     paddingLeft: theme.spacing(2),
-  },
-  pos: {
-    marginBottom: 12,
+    paddingTop: theme.spacing(1),
+    paddingBottom: theme.spacing(1),
   },
   dragger: {
     height: "auto",
@@ -67,67 +53,183 @@ const useStyles = makeStyles(theme => ({
     borderBottom: '1px solid #d6d6d6',
     borderTop: '1px solid #e0e0e0',
   },
+  formControlLabel: {
+    marginBottom: 0,
+  },
+  labelFontSize: {
+    fontSize: "14px",
+  },
+  radio: {
+    '&$checked': {
+      color: '#E10098'
+    }
+  },
+  checked: {},
+  closeButton: {
+    border: "1px",
+  }
 }));
 
 export default function MetaQueryInput(props) {
   const classes = useStyles();
   const {
-    handleChangedHeight,
+    selectedFilter,
+    handleResize,
+    handleFilterSelected,
+    handleRunMetaQuery,
+    handleCloseFilter,
   } = props;
-  const [metaQueryInputHeight, setMetaQueryInputHeight] = useState(defaultMetaQueryInputHeight);
+  const [filterValue, setFilterValue] = React.useState(selectedFilter);
+  //height's
+  const [metaQueryInputHeight, setMetaQueryInputHeight] = useState(Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0)*(.30)); //30vh
+  const minMetaQueryInputHeight = useRef(Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0)*(.10)); //10vh;
+  const maxMetaQueryInputHeight = useRef(Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0)*(.60)); //60vh;
+  //element refs
   const editorRef = useRef(null);
 
-  const handleMouseDown = e => {
-    document.addEventListener("mouseup", handleMouseUp, true);
-    document.addEventListener("mousemove", handleMouseMove, true);
-
-    console.log("@@mouseDown");
-  };
-
-  const handleMouseUp = () => {
-    document.removeEventListener("mouseup", handleMouseUp, true);
-    document.removeEventListener("mousemove", handleMouseMove, true);
-    console.log("@@mouseUp");
-  };
-
+  /**
+   * Callbacks
+   */
   const handleMouseMove = useCallback(e => {
+    //check: no left-button down
+    if(!e.buttons) {
+      document.removeEventListener("mousemove", handleMouseMove, true);
+      return;    
+    }
+    //set new height
     let c = document.getElementById('MetaQueryInput-box-root');
-
-    //console.log("@@mouseMove, clientY: ", e.clientY, "  offsetTop: ", c.offsetTop);
-    //console.log("@@ch: ", c.clientHeight);
-
     const newHeight = c.clientHeight + (c.offsetTop - e.clientY);
-    //console.log("@@new-h: ", newHeight);
-
-    if (newHeight > minMetaQueryInputHeight && newHeight < maxMetaQueryInputHeight) {
+    if (newHeight > minMetaQueryInputHeight.current && newHeight < maxMetaQueryInputHeight.current) {
       setMetaQueryInputHeight(newHeight);
     }
   }, []);
 
+  const handleMouseUp = useCallback(() => {
+    document.removeEventListener("mousemove", handleMouseMove, true);
+  }, [handleMouseMove]);
+
+  /**
+   * Effects
+   */
   useEffect(() => {
-  }, []);
+    //add event listeners
+    document.addEventListener("mouseup", handleMouseUp, true);
+
+    //cleanup
+    return () => {
+      //remove event listeners
+      document.removeEventListener("mouseup", handleMouseUp, true);
+      document.removeEventListener("mousemove", handleMouseMove, true);
+    }
+  }, [handleMouseUp, handleMouseMove]);
 
   useEffect(() => {
-    console.log("@@: metaQueryInputHeight: ", metaQueryInputHeight);
-    
-    //update parent
-    handleChangedHeight(metaQueryInputHeight);
+    if(filterValue && editorRef.current) {
+      let editor = editorRef.current.getCodeMirror();
+      let currentValue = editor.getValue();
+      if(!currentValue || currentValue === "{\n  \n}") {
+        editor.setValue("{\n  \n}"); //this is delayed
 
+        setTimeout (() => {
+          editor.focus();
+          editor.setCursor({line: 1, ch: 2});
+        }, 200);
+      }
+    }
+  }, [filterValue]);
+
+  useEffect(() => {
+    if(selectedFilter) setFilterValue(selectedFilter);
+  }, [selectedFilter]);
+
+  useEffect(() => {
+    //notify parent
+    if(handleResize) handleResize();
     
     if(editorRef.current) {
       //update editor height
       let editor = editorRef.current.getCodeMirror();
       editor.setSize("100%", metaQueryInputHeight);
     }
-  }, [metaQueryInputHeight]);
+  }, [metaQueryInputHeight, handleResize]);
+
+  /**
+   * Handlers
+   */
+  const handleMouseDown = e => {
+    if (typeof e === 'object') {
+      //update height's
+      minMetaQueryInputHeight.current = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0)*(.10); //10vh;
+      maxMetaQueryInputHeight.current = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0)*(.60); //60vh;
+
+      switch (e.button) {
+        case 0: //left button
+          e.preventDefault();
+          document.addEventListener("mousemove", handleMouseMove, true);
+          break;
+        default:
+          document.removeEventListener("mousemove", handleMouseMove, true);
+          break;
+      }
+    }
+  };
+
+  const handleChangeFilter = (event) => {
+    if(handleFilterSelected) handleFilterSelected(event.target.value);
+  };
+
+  const handleClickOnCloseFilter = () => {
+    if(handleCloseFilter) handleCloseFilter();
+  }
+
+  const handleClickOnRun = () => {
+    if(handleRunMetaQuery && editorRef.current) handleRunMetaQuery(editorRef.current.getCodeMirror().getValue());
+  }
 
   return (
     <Grid container spacing={0}>
       <Grid item xs={12}>
-        <div onMouseDown={e => handleMouseDown(e)} className={classes.dragger}>
-          <Typography className={classes.title} variant="overline">
-            Meta Query
-          </Typography>
+        <div className={classes.dragger} onMouseDown={e => handleMouseDown(e)} >
+          <Grid container spacing={4} alignItems="center" >
+            <Grid item>
+              <Typography className={classes.title} variant="h4" >
+                Filters
+              </Typography>
+            </Grid>
+            <Grid item>
+              <Fab size="small" onClick={handleClickOnRun}>
+                <PlayArrowIcon style={{ fontSize: 26 }}/>
+              </Fab>
+            </Grid>
+            <Grid item>
+              <FormControl className={classes.formControl} component="fieldset">
+                <RadioGroup row value={filterValue} onChange={handleChangeFilter}>
+                  <FormControlLabel 
+                    className={classes.formControlLabel}
+                    classes={{label:classes.labelFontSize}} 
+                    value="jq" 
+                    control={<Radio classes={{root: classes.radio, checked: classes.checked}}/>} 
+                    label="jq" />
+                  <FormControlLabel 
+                    className={classes.formControlLabel}
+                    classes={{label:classes.labelFontSize}}
+                    value="JsonPath" 
+                    control={<Radio classes={{root: classes.radio, checked: classes.checked}}/>} 
+                    label="JsonPath" />
+                </RadioGroup>
+              </FormControl>
+            </Grid>
+            <Grid item>
+              <Button
+                variant="outlined"
+                color="default"
+                startIcon={<CloseIcon />}
+                onClick={handleClickOnCloseFilter}
+              >
+                Close
+              </Button>
+            </Grid>
+          </Grid>
         </div>
         <Box id='MetaQueryInput-box-root'
           height={metaQueryInputHeight}
@@ -135,11 +237,13 @@ export default function MetaQueryInput(props) {
           position="relative"
           bottom={0}
         >
-            {/* <CodeMirror
+            <CodeMirror
               ref={editorRef}
               className={classes.codeMirror}
               options={{
                 mode: {name: 'javascript', json: true},
+                value: "{\n  \n}",
+                tabSize: 2,
                 lineNumbers: true,
                 foldGutter: true,
                 gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter", 'CodeMirror-lint-markers'],
@@ -147,7 +251,7 @@ export default function MetaQueryInput(props) {
                 highlightSelectionMatches: {showToken: true, annotateScrollbar: true},
                 lint: true
               }} 
-            /> */}
+            />
         </Box>
       </Grid>
     </Grid>

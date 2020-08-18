@@ -1,35 +1,27 @@
-import React, {useState, useRef, useEffect} from 'react';
+import React, {useState, useRef} from 'react';
 import GraphiQL from 'graphiql';
 import fetch from 'isomorphic-fetch';
 import MetaQueryInput from './MetaQueryInput'
-import clsx from 'clsx';
 import { makeStyles } from '@material-ui/core/styles';
 import Grid from '@material-ui/core/Grid';
 import Slide from '@material-ui/core/Slide';
-import Box from '@material-ui/core/Box';
-
+import Fade from '@material-ui/core/Fade';
 import './graphiql.css';
 import './cgraphiql.css'
 
 const useStyles = makeStyles(theme => ({
-  root: {
+  gridContainer: {
     width: "100%",
-    height: "100%"
+    height: `calc(100vh - 34px)`,
   },
-  graphiqlBoxIn: {
-    // transition: theme.transitions.create(['height'], {
-    //   easing: theme.transitions.easing.easeIn,
-    //   duration: theme.transitions.duration.enteringScreen,
-    // }),
-    overflow: 'hidden',
+  gridItemGraphiql: {
+    width: "100%",
+    flex: "1",
   },
-  graphiqlBoxOut: {
-    // transition: theme.transitions.create(['height'], {
-    //   easing: theme.transitions.easing.easeOut,
-    //   duration: theme.transitions.duration.leavingScreen,
-    // }),
-    overflow: 'hidden',
-  }
+  gridItemMetafilter: {
+    width: "100%",
+    flex: "0",
+  },
 }));
 
 const server_url = process.env.REACT_APP_SERVER_URL || 'http://localhost:3000/graphql';
@@ -37,11 +29,15 @@ const metaquery_url = process.env.REACT_APP_SERVER_METAQUERY_URL || 'http://loca
 
 export default function MyGraphiQL(props){
   const classes = useStyles();
-  const [editorContainerHeight, setEditorContainerHeight] = useState(0);
+  const [gridItemMetafilterHeight, setGridItemMetafilterHeight] = useState(0);
   const [selectedFilter, setSelectedFilter] = useState("");
   const [hasFilter, setHasFilter] = useState(false);
+  const selectedFilterRef = useRef("");
+  const runMetaQueryRef = useRef(false);
+  const metaQueryValueRef = useRef("");
   const graphiQL = useRef(null);
-  const editorContaierRef = useRef(null);
+  const gridItemMetafilterRef = useRef(null);
+  const gridItemGraphiqlRef = useRef(null);
 
   const checkLoggin = () =>{
     let expires = new Date(localStorage.getItem('expirationDate')) < new Date();
@@ -58,135 +54,145 @@ export default function MyGraphiQL(props){
       return;
     }
 
-    return fetch(server_url, {
-      method: 'post',
-      headers: headers,
-      body: JSON.stringify(graphQLParams),
-    }).then(response => response.json(), error => {
-      console.log("ERROR:", error);
-    });
+    /**
+     * Case: standard query
+     */
+    if(!runMetaQueryRef.current) {
+      return fetch(server_url, {
+        method: 'post',
+        headers: headers,
+        body: JSON.stringify(graphQLParams),
+      }).then(response => response.json(), error => {
+        console.log("ERROR:", error);
+      });
+    } else {
+      /**
+       * Case: meta-query
+       */
+      //reset flag
+      runMetaQueryRef.current = false;
+
+      //set metaQuery parameters
+      let metaQueryParams = {
+        queries:   graphQLParams,
+        jq:        selectedFilterRef.current==='jq' ? metaQueryValueRef.current: null,
+        jsonPath:  selectedFilterRef.current==='JsonPath' ? metaQueryValueRef.current: null,
+      };
+      
+      return fetch(metaquery_url, {
+        method: 'post',
+        headers: headers,
+        body: JSON.stringify(metaQueryParams),
+      }).then(response => response.json(), error => {
+        console.log("ERROR:", error);
+      });
+    }
   }
 
   const handlePrettifyQuery = () => {
-    if (graphiQL.current) {
+    if(graphiQL.current) {
       graphiQL.current.handlePrettifyQuery();
     }
   };
 
   const handleMergeQuery = () => {
-    if (graphiQL.current) {
+    if(graphiQL.current) {
       graphiQL.current.handleMergeQuery();
     }
   };
 
   const handleCopyQuery = () => {
-    if (graphiQL.current) {
+    if(graphiQL.current) {
       graphiQL.current.handleCopyQuery();
     }
   };
 
   const handleToggleHistory = () => {
-    if (graphiQL.current) {
+    if(graphiQL.current) {
       graphiQL.current.handleToggleHistory();
+    }
+  };
+
+  const handleRunMetaQuery = (value) => {
+    if(graphiQL.current) {
+      runMetaQueryRef.current = true;
+      metaQueryValueRef.current = value ? value : null;
+      graphiQL.current.handleEditorRunQuery();
     }
   };
 
   const handleFilterSelected = (value) => {
     setSelectedFilter(value);
     setHasFilter(Boolean(value));
-    console.log("@selectedFilter: ", value);
+    selectedFilterRef.current = (value);
   }
 
-  const handleEditorEnter = () => {
+  const handleCloseFilter = () => {
+    setSelectedFilter("");
+    setHasFilter(false);
+    selectedFilterRef.current = ("");
+  }
 
-    console.log("editorRef: ", editorContaierRef.current);
-
-    if(editorContaierRef.current) {
-      setEditorContainerHeight(editorContaierRef.current.clientHeight);
+  const handleResize = () => {
+    if(gridItemMetafilterRef.current) {
+      setGridItemMetafilterHeight(gridItemMetafilterRef.current.clientHeight+1);
     }
   }
 
-  const handleEditorExited = () => {
-    setEditorContainerHeight(0);
-  }
-
-  const handleChangedHeight = (newHeight) => {
-    if(editorContaierRef.current) {
-      console.log("@--- newHeight: ", newHeight, "  -- realHeight: ", editorContaierRef.current.clientHeight);
-
-      //update height
-      setEditorContainerHeight(editorContaierRef.current.clientHeight);
-    }
-
-  }
-
-  useEffect(() => {
-    console.log("@@: editorContainerHeight: ", editorContainerHeight);
-  }, [editorContainerHeight]);
-   
   return (
     <div>
-      <Grid container spacing={0}>
-        <Grid item xs={12}>
-          <Box
-            className={classes.graphiqlBox}
-            className={clsx(classes.graphiqlBoxIn, {
-              [classes.graphiqlBoxOut]: !hasFilter,
-            })}
-            height={`calc(100vh - 34px - ${editorContainerHeight}px)`}
-            bgcolor="background.paper"
+      <Grid container className={classes.gridContainer} spacing={0} direction="column" >
+        <Grid item 
+          style={hasFilter ? { maxHeight: `calc(100% - ${gridItemMetafilterHeight}px)` } : {maxHeight: '100%'}} 
+          className={classes.gridItemGraphiql}
+          ref={gridItemGraphiqlRef}
+        >
+          <GraphiQL
+            ref={graphiQL}
+            fetcher={graphQLFetcher}
           >
-            <GraphiQL
-              ref={graphiQL}
-              fetcher={graphQLFetcher}
-            >
-
-              <GraphiQL.Toolbar>
-                <GraphiQL.Button
-                  onClick={handlePrettifyQuery}
-                  label="Prettify"
-                  title="Prettify Query (Shift-Ctrl-P)"
-                />
-
-                <GraphiQL.Button
-                  onClick={handleMergeQuery}
-                  label="Merge"
-                  title="Merge Query (Shift-Ctrl-M)"
-                />
-
-                <GraphiQL.Button
-                  onClick={handleCopyQuery}
-                  label="Copy"
-                  title="Copy Query (Shift-Ctrl-C)"
-                />
-
-                <GraphiQL.Button
-                  onClick={handleToggleHistory}
-                  title="Show History"
-                  label="History"
-                />
-
-                <GraphiQL.Menu label="Filters" title="Filters">
-                  <GraphiQL.MenuItem label="Jq" title="Jq Filter" onSelect={() => handleFilterSelected('jq')} />
-                  <GraphiQL.MenuItem label="JsonPath" title="JsonPath Filter" onSelect={() => handleFilterSelected('jsonPath')} />
+            <GraphiQL.Toolbar>
+              <GraphiQL.Button
+                onClick={handlePrettifyQuery}
+                label="Prettify"
+                title="Prettify Query (Shift-Ctrl-P)"
+              />
+              <GraphiQL.Button
+                onClick={handleMergeQuery}
+                label="Merge"
+                title="Merge Query (Shift-Ctrl-M)"
+              />
+              <GraphiQL.Button
+                onClick={handleCopyQuery}
+                label="Copy"
+                title="Copy Query (Shift-Ctrl-C)"
+              />
+              <GraphiQL.Button
+                onClick={handleToggleHistory}
+                title="Show History"
+                label="History"
+              />
+              <GraphiQL.Menu label="Filters" title="Filters">
+                <GraphiQL.MenuItem label="jq" title="jq Filter" onSelect={() => handleFilterSelected('jq')} />
+                <GraphiQL.MenuItem label="JsonPath" title="JsonPath Filter" onSelect={() => handleFilterSelected('JsonPath')} />
+                <Fade in={hasFilter} mountOnEnter unmountOnExit >
                   <GraphiQL.MenuItem label="None" title="No filter" onSelect={() => handleFilterSelected('')} />
-                </GraphiQL.Menu>
-              </GraphiQL.Toolbar>
-            </GraphiQL>
-          </Box>
+                </Fade>
+              </GraphiQL.Menu>
+            </GraphiQL.Toolbar>
+          </GraphiQL>
         </Grid>
-        <Grid item xs={12}>
-          <div ref={editorContaierRef}>
-            <Slide direction="up" in={hasFilter} 
-              mountOnEnter unmountOnExit
-              onEnter={handleEditorEnter}
-              onExited={handleEditorExited}
-            >
+        <Grid item  className={classes.gridItemMetafilter} ref={gridItemMetafilterRef}>
+            <Slide direction="up" in={hasFilter} mountOnEnter unmountOnExit >
               <div>
-                <MetaQueryInput handleChangedHeight={handleChangedHeight}/>
+                <MetaQueryInput 
+                  selectedFilter={selectedFilter} 
+                  handleResize={handleResize}
+                  handleFilterSelected={handleFilterSelected}
+                  handleRunMetaQuery={handleRunMetaQuery}
+                  handleCloseFilter={handleCloseFilter} />
               </div>
             </Slide>
-          </div>
         </Grid>
       </Grid>
     </div>
