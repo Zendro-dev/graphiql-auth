@@ -9,6 +9,7 @@ import RadioGroup from '@material-ui/core/RadioGroup';
 import FormControlLabel from '@material-ui/core/FormControlLabel';
 import FormControl from '@material-ui/core/FormControl';
 import Fab from '@material-ui/core/Fab';
+import IconButton from '@material-ui/core/IconButton';
 import PlayArrowIcon from '@material-ui/icons/PlayArrow';
 import CloseIcon from '@material-ui/icons/Close';
 import CodeMirror from 'react-codemirror';
@@ -31,14 +32,54 @@ import 'codemirror/addon/fold/foldgutter.css';
 import 'codemirror/addon/lint/lint';
 import 'codemirror/addon/lint/json-lint';
 import 'codemirror/addon/lint/lint.css';
+import './ccodemirror.css';
 import jsonlint from "jsonlint-mod";
 window.jsonlint = jsonlint;
 
 const useStyles = makeStyles(theme => ({
   title: {
-    paddingLeft: theme.spacing(2),
+    paddingLeft: "14px",
     paddingTop: theme.spacing(1),
     paddingBottom: theme.spacing(1),
+    //graphiql style:
+    color: "#141823",
+    fontSize: "18px",
+    fontFamily: [
+      'system',
+      '-apple-system',
+      'San Francisco',
+      '.SFNSDisplay-Regular',
+      'Segoe UI',
+      'Segoe',
+      'Segoe WP',
+      'Helvetica Neue',
+      'helvetica',
+      'Lucida Grande',
+      'arial',
+      'sans-serif'
+    ].join(','),
+  },
+  em: {
+    //graphiql style:
+    fontSize: "19px",
+    fontFamily: "georgia",
+  },
+  executeButton: {
+    //graphiql style:
+    background: "linear-gradient(#fdfdfd, #d2d3d6)",
+    borderRadius: "17px",
+    border: "1px solid rgba(0,0,0,0.25)",
+    boxShadow: "0 1px 0 #fff",
+    cursor: "pointer",
+    fill: "#444",
+    height: "34px",
+    margin: 0,
+    padding: 0,
+    width: "34px",
+  },
+  executeButtonWrap: {
+    //graphiql style:
+    margin: "0 0px 0 20px",
   },
   dragger: {
     height: "auto",
@@ -49,8 +90,9 @@ const useStyles = makeStyles(theme => ({
     top: 0,
     bottom:0,
     zIndex: 100,
-    backgroundColor: "#eeeeee",
-    borderBottom: '1px solid #d6d6d6',
+    //graphiql style:
+    background: "linear-gradient(#f7f7f7, #e2e2e2)",
+    borderBottom: '1px solid #d0d0d0',
     borderTop: '1px solid #e0e0e0',
   },
   formControlLabel: {
@@ -84,8 +126,11 @@ export default function MetaQueryInput(props) {
   const [metaQueryInputHeight, setMetaQueryInputHeight] = useState(Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0)*(.30)); //30vh
   const minMetaQueryInputHeight = useRef(Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0)*(.10)); //10vh;
   const maxMetaQueryInputHeight = useRef(Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0)*(.60)); //60vh;
+  const minMetaQueryInputWidth = useRef(163);
+  const minMetaQueryOutputWidth = useRef(1);
   //element refs
-  const editorRef = useRef(null);
+  const codemirrorInputRef = useRef(null);
+  const codemirrorOutputRef = useRef(null);
 
   /**
    * Callbacks
@@ -104,8 +149,24 @@ export default function MetaQueryInput(props) {
     }
   }, []);
 
+  const handleMouseMoveB = useCallback(e => {
+    //check: no left-button down
+    if(!e.buttons) {
+      document.removeEventListener("mousemove", handleMouseMoveB, true);
+      return;    
+    }
+    //set new height
+    let c = document.getElementById('MetaQueryInput-box-root');
+    let vd = document.getElementById('vDragger-div');
+    const newHeight = c.clientHeight + (c.offsetTop - vd.clientY);
+    if (newHeight > minMetaQueryInputHeight.current && newHeight < maxMetaQueryInputHeight.current) {
+      setMetaQueryInputHeight(newHeight);
+    }
+  }, []);
+
   const handleMouseUp = useCallback(() => {
     document.removeEventListener("mousemove", handleMouseMove, true);
+    document.removeEventListener("mousemove", handleMouseMoveB, true);
   }, [handleMouseMove]);
 
   /**
@@ -120,21 +181,35 @@ export default function MetaQueryInput(props) {
       //remove event listeners
       document.removeEventListener("mouseup", handleMouseUp, true);
       document.removeEventListener("mousemove", handleMouseMove, true);
+      document.removeEventListener("mousemove", handleMouseMoveB, true);
     }
   }, [handleMouseUp, handleMouseMove]);
 
   useEffect(() => {
-    if(filterValue && editorRef.current) {
-      let editor = editorRef.current.getCodeMirror();
-      let currentValue = editor.getValue();
-      if(!currentValue || currentValue === "{\n  \n}") {
-        editor.setValue("{\n  \n}"); //this is delayed
+    if(filterValue && codemirrorInputRef.current && codemirrorOutputRef.current) {
+      //init: input editor
+      let ieditor = codemirrorInputRef.current.getCodeMirror();
+      let currentValue = ieditor.getValue();
+      if(!currentValue || currentValue === "") {
+        ieditor.setValue(""); //this is delayed
 
         setTimeout (() => {
-          editor.focus();
-          editor.setCursor({line: 1, ch: 2});
+          ieditor.focus();
+          ieditor.setCursor({line: 0, ch: 0});
         }, 200);
       }
+
+      //init: output editor
+      let oeditor = codemirrorOutputRef.current.getCodeMirror();
+      oeditor.on("gutterClick", function(line, gutter, clickEvent){
+        console.log("onGutterClick");
+      });
+      oeditor.on("blur", function(){
+        console.log("onBlur");
+      });
+      oeditor.on("mousedown", function(e){
+        console.log("onMousedown: ", e.target);
+      });
     }
   }, [filterValue]);
 
@@ -146,10 +221,15 @@ export default function MetaQueryInput(props) {
     //notify parent
     if(handleResize) handleResize();
     
-    if(editorRef.current) {
-      //update editor height
-      let editor = editorRef.current.getCodeMirror();
-      editor.setSize("100%", metaQueryInputHeight);
+    //update input-editor height
+    if(codemirrorInputRef.current) {
+      let oeditor = codemirrorInputRef.current.getCodeMirror();
+      oeditor.setSize("100%", metaQueryInputHeight);
+    }
+    //update output-editor height
+    if(codemirrorOutputRef.current) {
+      let ieditor = codemirrorOutputRef.current.getCodeMirror();
+      ieditor.setSize("100%", metaQueryInputHeight);
     }
   }, [metaQueryInputHeight, handleResize]);
 
@@ -174,6 +254,24 @@ export default function MetaQueryInput(props) {
     }
   };
 
+  const handleCodeMirrorOutputGutterMouseDown = e => {
+    if (typeof e === 'object') {
+      //update height's
+      minMetaQueryInputHeight.current = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0)*(.10); //10vh;
+      maxMetaQueryInputHeight.current = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0)*(.60); //60vh;
+
+      switch (e.button) {
+        case 0: //left button
+          e.preventDefault();
+          document.addEventListener("mousemove", handleMouseMoveB, true);
+          break;
+        default:
+          document.removeEventListener("mousemove", handleMouseMoveB, true);
+          break;
+      }
+    }
+  };
+
   const handleChangeFilter = (event) => {
     if(handleFilterSelected) handleFilterSelected(event.target.value);
   };
@@ -182,24 +280,32 @@ export default function MetaQueryInput(props) {
     if(handleCloseFilter) handleCloseFilter();
   }
 
-  const handleClickOnRun = () => {
-    if(handleRunMetaQuery && editorRef.current) handleRunMetaQuery(editorRef.current.getCodeMirror().getValue());
+  const handleClickOnRun = async () => {
+    if(handleRunMetaQuery && codemirrorInputRef.current && codemirrorOutputRef.current) {
+      let result = await handleRunMetaQuery(codemirrorInputRef.current.getCodeMirror().getValue());
+      let out = result ? JSON.stringify(result, null, 2) : "";
+      codemirrorOutputRef.current.getCodeMirror().setValue(out);
+    }
   }
 
   return (
     <Grid container spacing={0}>
       <Grid item xs={12}>
-        <div className={classes.dragger} onMouseDown={e => handleMouseDown(e)} >
+        <div id='vDragger-div' className={classes.dragger} onMouseDown={e => handleMouseDown(e)} >
           <Grid container spacing={4} alignItems="center" >
             <Grid item>
-              <Typography className={classes.title} variant="h4" >
-                Filters
-              </Typography>
+              <span className={classes.title} >
+                QF
+                <em className={classes.em}>i</em>
+                lter
+              </span>
             </Grid>
             <Grid item>
-              <Fab size="small" onClick={handleClickOnRun}>
-                <PlayArrowIcon style={{ fontSize: 26 }}/>
-              </Fab>
+              <div className={classes.executeButtonWrap}>
+                <IconButton size="small" className={classes.executeButton} onClick={handleClickOnRun}>
+                  <PlayArrowIcon style={{ fontSize: 26, color: "#141823" }}/>
+                </IconButton>
+              </div>
             </Grid>
             <Grid item>
               <FormControl className={classes.formControl} component="fieldset">
@@ -231,28 +337,56 @@ export default function MetaQueryInput(props) {
             </Grid>
           </Grid>
         </div>
-        <Box id='MetaQueryInput-box-root'
-          height={metaQueryInputHeight}
-          bgcolor="#efefef"
-          position="relative"
-          bottom={0}
-        >
-            <CodeMirror
-              ref={editorRef}
-              className={classes.codeMirror}
-              options={{
-                mode: {name: 'javascript', json: true},
-                value: "{\n  \n}",
-                tabSize: 2,
-                lineNumbers: true,
-                foldGutter: true,
-                gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter", 'CodeMirror-lint-markers'],
-                extraKeys: {"Ctrl-Q": function(cm){ cm.foldCode(cm.getCursor()); }},
-                highlightSelectionMatches: {showToken: true, annotateScrollbar: true},
-                lint: true
-              }} 
-            />
-        </Box>
+        <div>
+          <Grid container>
+            <Grid item xs={6}>
+              <Box id='MetaQueryInput-box-root'
+                height={metaQueryInputHeight}
+                bgcolor="#efefef"
+                position="relative"
+                bottom={0}
+              >
+                  <CodeMirror
+                    ref={codemirrorInputRef}
+                    options={{
+                      mode: {name: 'javascript', json: true},
+                      value: "",
+                      tabSize: 2,
+                      lineNumbers: true,
+                      foldGutter: true,
+                      gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"], //add: 'CodeMirror-lint-markers' gutter for lint markers.
+                      extraKeys: {"Ctrl-Q": function(cm){ cm.foldCode(cm.getCursor()); }},
+                      highlightSelectionMatches: {showToken: true, annotateScrollbar: true},
+                      lint: false
+                    }} 
+                  />
+              </Box>
+            </Grid>
+            <Grid item xs={6}>
+              <Box id='MetaQueryOutput-box-root'
+                height={metaQueryInputHeight}
+                bgcolor="#fff"
+                position="relative"
+                bottom={0}
+              >
+                  <CodeMirror
+                    ref={codemirrorOutputRef}
+                    options={{
+                      mode: {name: 'javascript', json: true},
+                      value: "",
+                      tabSize: 2,
+                      lineNumbers: false,
+                      foldGutter: true,
+                      gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"], //add: 'CodeMirror-lint-markers' gutter for lint markers.
+                      extraKeys: {"Ctrl-Q": function(cm){ cm.foldCode(cm.getCursor()); }},
+                      highlightSelectionMatches: {showToken: true, annotateScrollbar: true},
+                      lint: false
+                    }} 
+                  />
+              </Box>
+            </Grid>
+          </Grid>
+      </div>
       </Grid>
     </Grid>
   );

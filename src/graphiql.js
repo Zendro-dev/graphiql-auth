@@ -29,66 +29,73 @@ const metaquery_url = process.env.REACT_APP_SERVER_METAQUERY_URL || 'http://loca
 
 export default function MyGraphiQL(props){
   const classes = useStyles();
+  const { loginHandler } = props;
   const [gridItemMetafilterHeight, setGridItemMetafilterHeight] = useState(0);
+  const [metaQueryResult, setMetaQueryResult] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("");
   const [hasFilter, setHasFilter] = useState(false);
   const selectedFilterRef = useRef("");
   const runMetaQueryRef = useRef(false);
-  const metaQueryValueRef = useRef("");
+  const metaQueryFilterRef = useRef("");
   const graphiQL = useRef(null);
   const gridItemMetafilterRef = useRef(null);
   const gridItemGraphiqlRef = useRef(null);
 
-  const checkLoggin = () =>{
+  const checkLoggin = () => {
     let expires = new Date(localStorage.getItem('expirationDate')) < new Date();
     return (!!localStorage.getItem('token') &&  !expires);
   }
 
-  const graphQLFetcher = (graphQLParams)=> {
-    let headers = { 'Content-Type': 'application/json' };
-
-    if(checkLoggin()){
-      headers['Authorization'] = 'Bearer '+ localStorage.getItem('token');
-    }else{
-      props.loginHandler(false);
-      return;
-    }
-
-    /**
-     * Case: standard query
-     */
-    if(!runMetaQueryRef.current) {
-      return fetch(server_url, {
-        method: 'post',
-        headers: headers,
-        body: JSON.stringify(graphQLParams),
-      }).then(response => response.json(), error => {
-        console.log("ERROR:", error);
-      });
-    } else {
-      /**
-       * Case: meta-query
-       */
-      //reset flag
-      runMetaQueryRef.current = false;
-
-      //set metaQuery parameters
-      let metaQueryParams = {
-        queries:   graphQLParams,
-        jq:        selectedFilterRef.current==='jq' ? metaQueryValueRef.current: null,
-        jsonPath:  selectedFilterRef.current==='JsonPath' ? metaQueryValueRef.current: null,
-      };
-      
-      return fetch(metaquery_url, {
-        method: 'post',
-        headers: headers,
-        body: JSON.stringify(metaQueryParams),
-      }).then(response => response.json(), error => {
-        console.log("ERROR:", error);
-      });
-    }
+  const getHeaders = () => {
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer '+ localStorage.getItem('token'),
+    };
   }
 
+  const graphQLFetcher = (graphQLParams)=> {
+    //check login
+    if(!checkLoggin()){
+      loginHandler(false);
+      return;
+    }
+    let headers = getHeaders();
+
+    return fetch(server_url, {
+      method: 'post',
+      headers: headers,
+      body: JSON.stringify(graphQLParams),
+    }).then(response => response.json(), error => {
+      console.log("ERROR:", error);
+    });
+  };
+
+  const graphQLMetaFetcher = (graphQLParams)=> {
+    //check login
+    if(!checkLoggin()){
+      loginHandler(false);
+      return;
+    }
+    //set metaQuery parameters
+    let metaQueryParams = {
+      queries:   graphQLParams,
+      jq:        selectedFilterRef.current==='jq' ? metaQueryFilterRef.current: null,
+      jsonPath:  selectedFilterRef.current==='JsonPath' ? metaQueryFilterRef.current: null,
+    };
+    let headers = getHeaders();
+
+    return fetch(metaquery_url, {
+      method: 'post',
+      headers: headers,
+      body: JSON.stringify(metaQueryParams),
+    }).then(response => response.json(), error => {
+      console.log("ERROR:", error);
+    });
+  };
+
+  /**
+   * Handlers
+   */
   const handlePrettifyQuery = () => {
     if(graphiQL.current) {
       graphiQL.current.handlePrettifyQuery();
@@ -113,15 +120,38 @@ export default function MyGraphiQL(props){
     }
   };
 
-  const handleRunMetaQuery = (value) => {
+  const handleRunMetaQuery = async (filter) => {
+    //set meta-filter
+    metaQueryFilterRef.current = filter ? filter : null;
+
     if(graphiQL.current) {
-      runMetaQueryRef.current = true;
-      metaQueryValueRef.current = value ? value : null;
-      graphiQL.current.handleEditorRunQuery();
+      //graphql params
+      let graphQLParams = {
+        query: graphiQL.current.state.query,
+        operationName: graphiQL.current.state.operationName,
+        variables: graphiQL.current.state.variables ? JSON.parse(graphiQL.current.state.variables) : null,
+      }
+      
+      return graphQLMetaFetcher(graphQLParams).catch((err) => console.log("ERROR:", err));
     }
   };
 
+  const handleToggleFilter = () => {
+    if(selectedFilterRef.current) {
+      //close
+      selectedFilterRef.current = ("");
+      setSelectedFilter("");
+      setHasFilter(false);
+    } else {
+      //open (default: jq)
+      selectedFilterRef.current = ("jq");
+      setSelectedFilter("jq");
+      setHasFilter(true);
+    }
+  }
+
   const handleFilterSelected = (value) => {
+
     setSelectedFilter(value);
     setHasFilter(Boolean(value));
     selectedFilterRef.current = (value);
@@ -172,13 +202,11 @@ export default function MyGraphiQL(props){
                 title="Show History"
                 label="History"
               />
-              <GraphiQL.Menu label="Filters" title="Filters">
-                <GraphiQL.MenuItem label="jq" title="jq Filter" onSelect={() => handleFilterSelected('jq')} />
-                <GraphiQL.MenuItem label="JsonPath" title="JsonPath Filter" onSelect={() => handleFilterSelected('JsonPath')} />
-                <Fade in={hasFilter} mountOnEnter unmountOnExit >
-                  <GraphiQL.MenuItem label="None" title="No filter" onSelect={() => handleFilterSelected('')} />
-                </Fade>
-              </GraphiQL.Menu>
+              <GraphiQL.Button
+                onClick={handleToggleFilter}
+                title={hasFilter ? "Close Filter" : "Show Filter"}
+                label="Filter"
+              />
             </GraphiQL.Toolbar>
           </GraphiQL>
         </Grid>
@@ -186,7 +214,8 @@ export default function MyGraphiQL(props){
             <Slide direction="up" in={hasFilter} mountOnEnter unmountOnExit >
               <div>
                 <MetaQueryInput 
-                  selectedFilter={selectedFilter} 
+                  selectedFilter={selectedFilter}
+                  metaQueryResult={metaQueryResult}
                   handleResize={handleResize}
                   handleFilterSelected={handleFilterSelected}
                   handleRunMetaQuery={handleRunMetaQuery}
