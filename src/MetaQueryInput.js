@@ -109,7 +109,7 @@ const useStyles = makeStyles(theme => ({
   checked: {},
   closeButton: {
     border: "1px",
-  }
+  },
 }));
 
 export default function MetaQueryInput(props) {
@@ -122,12 +122,25 @@ export default function MetaQueryInput(props) {
     handleCloseFilter,
   } = props;
   const [filterValue, setFilterValue] = React.useState(selectedFilter);
-  //height's
+  //height's & width's
   const [metaQueryInputHeight, setMetaQueryInputHeight] = useState(Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0)*(.30)); //30vh
-  const minMetaQueryInputHeight = useRef(Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0)*(.10)); //10vh;
-  const maxMetaQueryInputHeight = useRef(Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0)*(.60)); //60vh;
-  const minMetaQueryInputWidth = useRef(163);
-  const minMetaQueryOutputWidth = useRef(1);
+  const [metaQueryInputWidth, setMetaQueryInputWidth] = useState(Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0)*(2.79208/3.79208));
+  const [metaQueryInputFlexGrow, setMetaQueryInputFlexGrow] = useState(2.79208);
+  const [metaQueryOutputWidth, setMetaQueryOutputWidth] = useState(Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0)*(1/3.79208));
+
+  const metaQueryInputHeightRef = useRef(Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0)*(.30)); //30vh
+  const metaQueryInputWidthRef = useRef(Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0)*(2.79208/3.79208));
+  const metaQueryInputFlexGrowRef = useRef(2.79208);
+  const metaQueryOutputWidthRef = useRef(Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0)*(1/3.79208));
+  
+  const minMetaQueryInputHeightRef = useRef(Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0)*(.10)); //10vh;
+  const maxMetaQueryInputHeightRef = useRef(Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0)*(.60)); //60vh;
+  const minMetaQueryInputWidthRef = useRef(108.1);
+  const inputWidthRatioRef = useRef(2.79208/3.79208);
+  const outputWidthRatioRef = useRef(1/3.79208);
+  const updateValuesLockRef = useRef(false);
+  const updateValuesLockBRef = useRef(false);
+  
   //element refs
   const codemirrorInputRef = useRef(null);
   const codemirrorOutputRef = useRef(null);
@@ -143,35 +156,129 @@ export default function MetaQueryInput(props) {
     }
     //set new height
     let c = document.getElementById('MetaQueryInput-box-root');
-    const newHeight = c.clientHeight + (c.offsetTop - e.clientY);
-    if (newHeight > minMetaQueryInputHeight.current && newHeight < maxMetaQueryInputHeight.current) {
+    let newHeight = c.clientHeight + (c.offsetTop - e.clientY);
+    if (newHeight > minMetaQueryInputHeightRef.current && newHeight < maxMetaQueryInputHeightRef.current) {
+      metaQueryInputHeightRef.current = newHeight;
       setMetaQueryInputHeight(newHeight);
     }
   }, []);
 
-  const handleMouseMoveB = useCallback(e => {
+  const handleMouseMoveB = useCallback(async (e) => {
     //check: no left-button down
     if(!e.buttons) {
       document.removeEventListener("mousemove", handleMouseMoveB, true);
       return;    
     }
-    //set new height
-    let c = document.getElementById('MetaQueryInput-box-root');
-    let vd = document.getElementById('vDragger-div');
-    const newHeight = c.clientHeight + (c.offsetTop - vd.clientY);
-    if (newHeight > minMetaQueryInputHeight.current && newHeight < maxMetaQueryInputHeight.current) {
-      setMetaQueryInputHeight(newHeight);
+
+    //set max width to current viewport width.
+    let maxWidth = (Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0));
+    
+    //new values
+    let newWidth = e.clientX; 
+    let newOutputWidth = maxWidth - newWidth;
+    let newFlexGrow = newWidth / newOutputWidth;
+
+    if(newWidth > minMetaQueryInputWidthRef.current && newWidth < (maxWidth-10)) {
+      //update flex-grow
+      metaQueryInputFlexGrowRef.current = newFlexGrow;
+      //update width's
+      metaQueryInputWidthRef.current = newWidth;
+      metaQueryOutputWidthRef.current = newOutputWidth;
+      //update width's ratios
+      inputWidthRatioRef.current = newFlexGrow/(1+newFlexGrow);
+      outputWidthRatioRef.current = 1/(1+newFlexGrow);
+      //delayed state update
+      if(updateValuesLockRef.current === false) {
+        updateValuesLockRef.current = true;
+        delayedUpdateValues(100);
+      }
     }
   }, []);
 
   const handleMouseUp = useCallback(() => {
     document.removeEventListener("mousemove", handleMouseMove, true);
     document.removeEventListener("mousemove", handleMouseMoveB, true);
+  }, [handleMouseMove, handleMouseMoveB]);
+
+  const handleMouseDownOnHorizontalDragger = useCallback((e) => {
+    if (typeof e === 'object') {
+      //update height's
+      minMetaQueryInputHeightRef.current = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0)*(.10); //10vh;
+      maxMetaQueryInputHeightRef.current = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0)*(.60); //60vh;
+
+      switch (e.button) {
+        case 0: //left button
+          e.preventDefault();
+          document.addEventListener("mousemove", handleMouseMove, true);
+          break;
+        default:
+          document.removeEventListener("mousemove", handleMouseMove, true);
+          break;
+      }
+    }
   }, [handleMouseMove]);
+
+  const handleMouseDownOnOutputCodeMirrorGutter = useCallback((e) => {
+    if (e && typeof e === 'object') {
+      switch (e.button) {
+        case 0: //left button
+          e.preventDefault();
+          document.addEventListener("mousemove", handleMouseMoveB, true);
+          break;
+        default:
+          document.removeEventListener("mousemove", handleMouseMoveB, true);
+          break;
+      }
+    }
+  }, [handleMouseMoveB]);
+
+  const handleWindowsResize = () => {
+    /**
+     * Update width's
+     */
+    //set max width to current viewport width.
+    let maxWidth = (Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0));
+    //new widths
+    let newWidth = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0)*(inputWidthRatioRef.current);
+    let newOutputWidth = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0)*(outputWidthRatioRef.current);
+    if(newWidth > minMetaQueryInputWidthRef.current && newWidth < (maxWidth-10)) {
+      metaQueryInputWidthRef.current = newWidth;
+      metaQueryOutputWidthRef.current = newOutputWidth;
+      //delayed state update
+      if(updateValuesLockBRef.current === false) {
+        updateValuesLockBRef.current = true;
+        delayedUpdateValuesB(100);
+      }
+    }
+    /**
+     * Update height's
+     */
+    minMetaQueryInputHeightRef.current = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0)*(.10); //10vh;
+    maxMetaQueryInputHeightRef.current = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0)*(.60); //60vh;
+    //set new height
+    if (metaQueryInputHeightRef.current > (maxMetaQueryInputHeightRef.current - 70)) {
+      metaQueryInputHeightRef.current = maxMetaQueryInputHeightRef.current - 70;
+      setMetaQueryInputHeight(maxMetaQueryInputHeightRef.current - 70);
+    } else if(metaQueryInputHeightRef.current < (minMetaQueryInputHeightRef.current)) {
+      metaQueryInputHeightRef.current = minMetaQueryInputHeightRef.current;
+      setMetaQueryInputHeight(minMetaQueryInputHeightRef.current);
+    }
+  };
 
   /**
    * Effects
    */
+  useEffect(() => {
+    //add event listeners
+    window.addEventListener("resize", handleWindowsResize);
+
+    //cleanup
+    return () => {
+      //remove event listeners
+      window.addEventListener("resize", handleWindowsResize);
+    }
+  }, []);
+
   useEffect(() => {
     //add event listeners
     document.addEventListener("mouseup", handleMouseUp, true);
@@ -183,7 +290,7 @@ export default function MetaQueryInput(props) {
       document.removeEventListener("mousemove", handleMouseMove, true);
       document.removeEventListener("mousemove", handleMouseMoveB, true);
     }
-  }, [handleMouseUp, handleMouseMove]);
+  }, [handleMouseUp, handleMouseMove, handleMouseMoveB]);
 
   useEffect(() => {
     if(filterValue && codemirrorInputRef.current && codemirrorOutputRef.current) {
@@ -201,17 +308,13 @@ export default function MetaQueryInput(props) {
 
       //init: output editor
       let oeditor = codemirrorOutputRef.current.getCodeMirror();
-      oeditor.on("gutterClick", function(line, gutter, clickEvent){
-        console.log("onGutterClick");
-      });
-      oeditor.on("blur", function(){
-        console.log("onBlur");
-      });
-      oeditor.on("mousedown", function(e){
-        console.log("onMousedown: ", e.target);
+      oeditor.on("mousedown", function(cm, e){
+        if(e&&e.target&&e.target.className&&e.target.className.indexOf('CodeMirror-gutter') === 0) {
+          handleMouseDownOnOutputCodeMirrorGutter(e);
+        }
       });
     }
-  }, [filterValue]);
+  }, [filterValue, handleMouseDownOnOutputCodeMirrorGutter]);
 
   useEffect(() => {
     if(selectedFilter) setFilterValue(selectedFilter);
@@ -236,42 +339,6 @@ export default function MetaQueryInput(props) {
   /**
    * Handlers
    */
-  const handleMouseDown = e => {
-    if (typeof e === 'object') {
-      //update height's
-      minMetaQueryInputHeight.current = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0)*(.10); //10vh;
-      maxMetaQueryInputHeight.current = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0)*(.60); //60vh;
-
-      switch (e.button) {
-        case 0: //left button
-          e.preventDefault();
-          document.addEventListener("mousemove", handleMouseMove, true);
-          break;
-        default:
-          document.removeEventListener("mousemove", handleMouseMove, true);
-          break;
-      }
-    }
-  };
-
-  const handleCodeMirrorOutputGutterMouseDown = e => {
-    if (typeof e === 'object') {
-      //update height's
-      minMetaQueryInputHeight.current = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0)*(.10); //10vh;
-      maxMetaQueryInputHeight.current = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0)*(.60); //60vh;
-
-      switch (e.button) {
-        case 0: //left button
-          e.preventDefault();
-          document.addEventListener("mousemove", handleMouseMoveB, true);
-          break;
-        default:
-          document.removeEventListener("mousemove", handleMouseMoveB, true);
-          break;
-      }
-    }
-  };
-
   const handleChangeFilter = (event) => {
     if(handleFilterSelected) handleFilterSelected(event.target.value);
   };
@@ -288,11 +355,39 @@ export default function MetaQueryInput(props) {
     }
   }
 
+  /**
+   * Utils
+   */
+  const delayedUpdateValues = async (ms) => {
+    await new Promise(resolve => {
+      //set timeout
+      window.setTimeout(function() {
+        updateValuesLockRef.current = false;
+        setMetaQueryInputFlexGrow(metaQueryInputFlexGrowRef.current);
+        setMetaQueryInputWidth(metaQueryInputWidthRef.current);
+        setMetaQueryOutputWidth(metaQueryOutputWidthRef.current);
+        resolve("ok");
+      }, ms);
+    });
+  };
+
+  const delayedUpdateValuesB = async (ms) => {
+    await new Promise(resolve => {
+      //set timeout
+      window.setTimeout(function() {
+        updateValuesLockBRef.current = false;
+        setMetaQueryInputWidth(metaQueryInputWidthRef.current);
+        setMetaQueryOutputWidth(metaQueryOutputWidthRef.current);
+        resolve("ok");
+      }, ms);
+    });
+  };
+
   return (
-    <Grid container spacing={0}>
+    <Grid container wrap='nowrap' spacing={0}>
       <Grid item xs={12}>
-        <div id='vDragger-div' className={classes.dragger} onMouseDown={e => handleMouseDown(e)} >
-          <Grid container spacing={4} alignItems="center" >
+        <div id='hDragger-div' className={classes.dragger} onMouseDown={e => handleMouseDownOnHorizontalDragger(e)} >
+          <Grid container wrap='nowrap' spacing={4} alignItems="center" >
             <Grid item>
               <span className={classes.title} >
                 QF
@@ -338,53 +433,67 @@ export default function MetaQueryInput(props) {
           </Grid>
         </div>
         <div>
-          <Grid container>
-            <Grid item xs={6}>
+          <Grid container wrap='nowrap'>
+            
               <Box id='MetaQueryInput-box-root'
                 height={metaQueryInputHeight}
+                width={metaQueryInputWidth}
+                flexGrow={metaQueryInputFlexGrow}
+                flexShrink={1}
+                flexBasis="0%"
                 bgcolor="#efefef"
                 position="relative"
                 bottom={0}
               >
-                  <CodeMirror
-                    ref={codemirrorInputRef}
-                    options={{
-                      mode: {name: 'javascript', json: true},
-                      value: "",
-                      tabSize: 2,
-                      lineNumbers: true,
-                      foldGutter: true,
-                      gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"], //add: 'CodeMirror-lint-markers' gutter for lint markers.
-                      extraKeys: {"Ctrl-Q": function(cm){ cm.foldCode(cm.getCursor()); }},
-                      highlightSelectionMatches: {showToken: true, annotateScrollbar: true},
-                      lint: false
-                    }} 
-                  />
+                {/**
+                 * Input editor  
+                 */}
+                <CodeMirror
+                  ref={codemirrorInputRef}
+                  options={{
+                    mode: {name: 'javascript', json: true},
+                    value: "",
+                    tabSize: 2,
+                    lineNumbers: true,
+                    foldGutter: true,
+                    gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"], //add: 'CodeMirror-lint-markers' gutter for lint markers.
+                    extraKeys: {"Ctrl-Q": function(cm){ cm.foldCode(cm.getCursor()); }},
+                    highlightSelectionMatches: {showToken: true, annotateScrollbar: true},
+                    lint: false
+                  }} 
+                />
               </Box>
-            </Grid>
-            <Grid item xs={6}>
+            
+            
               <Box id='MetaQueryOutput-box-root'
                 height={metaQueryInputHeight}
+                width={metaQueryOutputWidth}
+                flex={"1 1"}
                 bgcolor="#fff"
                 position="relative"
                 bottom={0}
               >
-                  <CodeMirror
-                    ref={codemirrorOutputRef}
-                    options={{
-                      mode: {name: 'javascript', json: true},
-                      value: "",
-                      tabSize: 2,
-                      lineNumbers: false,
-                      foldGutter: true,
-                      gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"], //add: 'CodeMirror-lint-markers' gutter for lint markers.
-                      extraKeys: {"Ctrl-Q": function(cm){ cm.foldCode(cm.getCursor()); }},
-                      highlightSelectionMatches: {showToken: true, annotateScrollbar: true},
-                      lint: false
-                    }} 
-                  />
+                {/**
+                 * Output editor  
+                 */}
+                <CodeMirror
+                  ref={codemirrorOutputRef}
+                  options={{
+                    mode: {name: 'javascript', json: true},
+                    readOnly: true,
+                    value: "",
+                    tabSize: 2,
+                    lineNumbers: false,
+                    lineWrapping: true,
+                    foldGutter: true,
+                    gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"], //add: 'CodeMirror-lint-markers' gutter for lint markers.
+                    extraKeys: {"Ctrl-Q": function(cm){ cm.foldCode(cm.getCursor()); }},
+                    highlightSelectionMatches: {showToken: true, annotateScrollbar: true},
+                    lint: false
+                  }} 
+                />
               </Box>
-            </Grid>
+            
           </Grid>
       </div>
       </Grid>
