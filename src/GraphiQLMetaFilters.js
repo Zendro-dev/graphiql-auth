@@ -122,6 +122,7 @@ export default function GraphiQLMetaFilters(props) {
     selectedFilter,
     filterHeight,
     onInitVerticalResize,
+    onNewResult,
     handleFilterSelected,
     handleRunMetaQuery,
     handleCloseFilter,
@@ -142,13 +143,14 @@ export default function GraphiQLMetaFilters(props) {
   /**
    * Callbacks
    *  initHorizontalResize
-   *  
+   *  onRun
    */
   const initHorizontalResize = useCallback((mouseDownEvent) => {
     //check
-    if(!mouseDownEvent || typeof mouseDownEvent !== 'object') return;    
+    if(!mouseDownEvent || typeof mouseDownEvent !== 'object') return;   
 
     let offsetX = mouseDownEvent.offsetX;
+    //event handler
     let handleMouseMove = function(mouseMoveEvent) {
       //check: no left-button down
       if(!mouseMoveEvent.buttons) {
@@ -163,7 +165,7 @@ export default function GraphiQLMetaFilters(props) {
       let newFlexGrow = newWidth / newOutputWidth;
 
       //check limits
-      if(newWidth > minMetaQueryInputWidthRef.current && newWidth < (maxWidth-10)) {
+      if(newWidth > minMetaQueryInputWidthRef.current && newWidth < (maxWidth-15)) {
         //update flex-grow
         metaQueryInputFlexGrowRef.current = newFlexGrow;
         //delayed state update (debounce)
@@ -173,8 +175,8 @@ export default function GraphiQLMetaFilters(props) {
         }
       }
     }
+    //event handler
     let handleMouseUp = function () {
-      console.log("@@onHandleMouseUp: do clean");
       document.removeEventListener("mousemove", handleMouseMove, true);
       document.removeEventListener('mouseup', handleMouseUp);
     };
@@ -190,47 +192,75 @@ export default function GraphiQLMetaFilters(props) {
   }, []);
 
   /**
+   * onRun   Executes meta query.
+   * 
+   */
+  const onRun = useCallback(async () => {
+    //check
+    if(!handleRunMetaQuery) return;
+    if(!codemirrorInputRef || !codemirrorInputRef.current) return;
+    if(!codemirrorOutputRef || !codemirrorOutputRef.current) return;
+
+    let result = await handleRunMetaQuery(codemirrorInputRef.current.getValue().trim());
+    let newValue = result ? JSON.stringify(result, null, 2) : "";
+
+    //event handler
+    let onChange = function(){ 
+      onNewResult();
+      codemirrorOutputRef.current.off("change", onChange)
+    }
+    //add event listener
+    codemirrorOutputRef.current.on("change", onChange)
+    //set new value
+    codemirrorOutputRef.current.setValue(newValue);
+  }, [handleRunMetaQuery, onNewResult]);
+
+  /**
    * Effects
    */
   useEffect(() => {
+    //check
+    if(!codemirrorInputDivRef || !codemirrorInputDivRef.current) return;
+    if(!codemirrorOutputDivRef || !codemirrorOutputDivRef.current) return;
+
     //initialize codeMirror (input editor)
-    if(codemirrorInputDivRef && codemirrorInputDivRef.current)
-    {
-      codemirrorInputRef.current = CodeMirror(codemirrorInputDivRef.current, {
-        mode: {name: 'javascript', json: true},
-        value: "",
-        tabSize: 2,
-        lineNumbers: true,
-        foldGutter: true,
-        gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"], //add: 'CodeMirror-lint-markers' gutter for lint markers.
-        extraKeys: {"Ctrl-Q": function(cm){ cm.foldCode(cm.getCursor()); }},
-        highlightSelectionMatches: {showToken: true, annotateScrollbar: true},
-        lint: false,
-      });
-      codemirrorInputRef.current.setSize("100%", "100%");
-    }
+    codemirrorInputRef.current = CodeMirror(codemirrorInputDivRef.current, {
+      mode: {name: 'javascript', json: true},
+      value: "",
+      tabSize: 2,
+      lineNumbers: true,
+      foldGutter: true,
+      gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"], //add: 'CodeMirror-lint-markers' gutter for lint markers.
+      highlightSelectionMatches: {showToken: true, annotateScrollbar: true},
+      lint: false,
+    });
+    codemirrorInputRef.current.setSize("100%", "100%");
+
     //initialize codeMirror (output editor)
-    if(codemirrorOutputDivRef && codemirrorOutputDivRef.current)
-    {
-      codemirrorOutputRef.current = CodeMirror(codemirrorOutputDivRef.current, {
-        mode: {name: 'javascript', json: true},
-        readOnly: true,
-        value: "",
-        tabSize: 2,
-        lineNumbers: false,
-        lineWrapping: true,
-        foldGutter: true,
-        gutters: ["CodeMirror-foldgutter"], //add: 'CodeMirror-lint-markers' gutter for lint markers.
-        extraKeys: {"Ctrl-Q": function(cm){ cm.foldCode(cm.getCursor()); }},
-        highlightSelectionMatches: {showToken: true, annotateScrollbar: true},
-        lint: false,
-      });
-      codemirrorOutputRef.current.setSize("100%", "100%");
-    }
+    codemirrorOutputRef.current = CodeMirror(codemirrorOutputDivRef.current, {
+      mode: {name: 'javascript', json: true},
+      readOnly: true,
+      value: "",
+      tabSize: 2,
+      lineNumbers: false,
+      lineWrapping: true,
+      foldGutter: true,
+      gutters: ["CodeMirror-foldgutter"], //add: 'CodeMirror-lint-markers' gutter for lint markers.
+      extraKeys: {
+        "Ctrl-Q": function(cm){ cm.foldCode(cm.getCursor()); },
+      },
+      highlightSelectionMatches: {showToken: true, annotateScrollbar: true},
+      lint: false,
+    });
+    codemirrorOutputRef.current.setSize("100%", "100%");
   }, []);
 
   useEffect(() => {
-    if(filterValue && codemirrorInputRef.current && codemirrorOutputRef.current) {
+    //check
+    if(!codemirrorInputRef || !codemirrorInputRef.current) return;
+    if(!codemirrorOutputRef || !codemirrorOutputRef.current) return;
+
+    if(filterValue) {
       //init: input editor
       let ieditor = codemirrorInputRef.current;
       let currentValue = ieditor.getValue();
@@ -242,6 +272,10 @@ export default function GraphiQLMetaFilters(props) {
           ieditor.setCursor({line: 0, ch: 0});
         }, 200);
       }
+      ieditor.setOption("extraKeys", {
+        "Ctrl-Q": function(cm){ cm.foldCode(cm.getCursor()); },
+        "Ctrl-Enter": function(cm){onRun()},
+      });
 
       //init: output editor
       let oeditor = codemirrorOutputRef.current;
@@ -251,7 +285,7 @@ export default function GraphiQLMetaFilters(props) {
         }
       });
     }
-  }, [filterValue, initHorizontalResize]);
+  }, [filterValue, initHorizontalResize, onRun]);
 
   useEffect(() => {
     if(selectedFilter) setFilterValue(selectedFilter);
@@ -266,14 +300,6 @@ export default function GraphiQLMetaFilters(props) {
 
   const handleClickOnCloseFilter = () => {
     if(handleCloseFilter) handleCloseFilter();
-  }
-
-  const handleClickOnRun = async () => {
-    if(handleRunMetaQuery && codemirrorInputRef.current && codemirrorOutputRef.current) {
-      let result = await handleRunMetaQuery(codemirrorInputRef.current.getValue());
-      let out = result ? JSON.stringify(result, null, 2) : "";
-      codemirrorOutputRef.current.setValue(out);
-    }
   }
 
   /**
@@ -304,7 +330,7 @@ export default function GraphiQLMetaFilters(props) {
             </Grid>
             <Grid item style={{padding: 0, margin: 0}}>
               <div className={classes.executeButtonWrap}>
-                <IconButton size="small" className={classes.executeButton} onClick={handleClickOnRun}>
+                <IconButton size="small" className={classes.executeButton} onClick={onRun}>
                   <PlayArrowIcon style={{ fontSize: 26, color: "#141823" }}/>
                 </IconButton>
               </div>

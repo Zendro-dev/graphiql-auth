@@ -85,7 +85,11 @@ export default function MyGraphiQL(props){
       headers: headers,
       body: JSON.stringify(metaQueryParams),
     }).then(response => response.json(), error => {
-      console.log("ERROR:", error);
+      console.error("Error:", error);
+      return {errors: error.message};
+    }).catch((error) => {
+      console.error("Error:", error);
+      return {errors: error.message};
     });
   };
 
@@ -93,13 +97,18 @@ export default function MyGraphiQL(props){
    * Effects
    */
   useEffect(() => {
+    //check
+    if(!filterElementRef || !filterElementRef.current) return;
+
     //define resize handler
     let handleWindowsResize = function () {
+      //check
+      if(!filterElementRef || !filterElementRef.current) return;
       setFilterElementHeight(filterElementRef.current.clientHeight);
     };
     //set filter height
-    if(filterElementRef&&filterElementRef.current&&hasFilter) {
-      setFilterElementHeight(filterElementRef.current.clientHeight);
+    if(hasFilter) {
+      setFilterElementHeight((Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0)-34)*(.5));
       //add event listener
       window.addEventListener("resize", handleWindowsResize);
     } else {
@@ -112,70 +121,76 @@ export default function MyGraphiQL(props){
    * Handlers
    */
   const handlePrettifyQuery = () => {
-    if(graphiQL.current) {
-      graphiQL.current.handlePrettifyQuery();
-    }
+    //check
+    if(!graphiQL || !graphiQL.current) return;
+    graphiQL.current.handlePrettifyQuery();
   };
 
   const handleMergeQuery = () => {
-    if(graphiQL.current) {
-      graphiQL.current.handleMergeQuery();
-    }
+    //check
+    if(!graphiQL || !graphiQL.current) return;
+    graphiQL.current.handleMergeQuery();
   };
 
   const handleCopyQuery = () => {
-    if(graphiQL.current) {
-      graphiQL.current.handleCopyQuery();
-    }
+    //check
+    if(!graphiQL || !graphiQL.current) return;
+    graphiQL.current.handleCopyQuery();
   };
 
   const handleToggleHistory = () => {
-    if(graphiQL.current) {
-      graphiQL.current.handleToggleHistory();
-    }
+    //check
+    if(!graphiQL || !graphiQL.current) return;
+    graphiQL.current.handleToggleHistory();
   };
 
   const handleRunMetaQuery = async (filter) => {
+    //check
+    if(!graphiQL || !graphiQL.current) return;
+
     //set meta-filter
     filterValueRef.current = filter ? filter : null;
-
-    if(graphiQL.current) {
-      //graphql params
-      let graphQLParams = {
-        query: graphiQL.current.state.query,
-        operationName: graphiQL.current.state.operationName,
-        variables: graphiQL.current.state.variables ? JSON.parse(graphiQL.current.state.variables) : null,
-      }
-      
-      return graphQLMetaFetcher(graphQLParams).catch((err) => console.log("ERROR:", err));
+    //graphql params
+    let graphQLParams = {
+      query: graphiQL.current.state.query,
+      operationName: graphiQL.current.state.operationName,
+      variables: graphiQL.current.state.variables ? JSON.parse(graphiQL.current.state.variables) : null,
     }
+    return graphQLMetaFetcher(graphQLParams).catch((err) => {console.log("Error:", err); return {error: err.message}});
   };
 
   const handleToggleFilter = () => {
     if(selectedFilterRef.current) {
       //close
-      selectedFilterRef.current = ("");
+      selectedFilterRef.current = "";
       setSelectedFilter("");
       setHasFilter(false);
     } else {
       //open (default: jq)
-      selectedFilterRef.current = ("jq");
+      selectedFilterRef.current = "jq";
       setSelectedFilter("jq");
       setHasFilter(true);
     }
   }
 
   const handleFilterSelected = (value) => {
-
     setSelectedFilter(value);
     setHasFilter(Boolean(value));
-    selectedFilterRef.current = (value);
+    selectedFilterRef.current = value;
   }
 
   const handleCloseFilter = () => {
     setSelectedFilter("");
     setHasFilter(false);
-    selectedFilterRef.current = ("");
+    selectedFilterRef.current = "";
+  }
+
+  const onNewResult = () => {
+    //check
+    if(!filterElementHeightRef || !filterElementHeightRef.current) return;
+    if(!graphiQLflexGrowRef || !graphiQLflexGrowRef.current) return;
+    setFilterElementHeight(filterElementHeightRef.current);
+    setGraphiQLflexGrow(graphiQLflexGrowRef.current);
   }
 
   const onInitVerticalResize = (mouseDownEvent) => {
@@ -183,10 +198,23 @@ export default function MyGraphiQL(props){
     if(!mouseDownEvent || typeof mouseDownEvent !== 'object') return;
     if(!graphiqlElementRef || !graphiqlElementRef.current) return;
 
+    /**
+     * Get GraphiQL variable-editor heigth.
+     * This is needed because when variable-editor is open,
+     * it has a fixed hegiht that not allow the filter-editor
+     * to shrink it.
+     */
+    let veditor = document.getElementsByClassName('variable-editor secondary-editor');
+    let veditorHeight = 30; //veditor-title height
+    if(veditor && typeof veditor==='object' && veditor.length === 1 
+    && veditor[0].clientHeight>30) { //variable-editor is open
+      veditorHeight = veditor[0].clientHeight;
+    }
+
     //set initial values
     let initialY = mouseDownEvent.clientY;
     let initialHeight = graphiqlElementRef.current.clientHeight;
-
+    //event handler
     let handleMouseMove = function(mouseMoveEvent) {
       //check: no left-button down
       if(!mouseMoveEvent.buttons) {
@@ -200,7 +228,8 @@ export default function MyGraphiQL(props){
       let newFilterHeight = maxHeight - newHeight;
       let newFlexGrow = newHeight / newFilterHeight;
       //check limits
-      if(newHeight > 100 && newHeight <= (maxHeight-34)) {
+      if(newHeight >= (34+veditorHeight) && newHeight <= (maxHeight-34)) {
+        console.log("@@ iniH: ", initialHeight, "nH: ", newHeight, "  minLimit: ", (34+veditorHeight));
         //update flex-grow
         graphiQLflexGrowRef.current = newFlexGrow;
         //update filter height
@@ -212,11 +241,12 @@ export default function MyGraphiQL(props){
         }
       }
     }
+    //event handler
     let handleMouseUp = function () {
       document.removeEventListener("mousemove", handleMouseMove, true);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-
+    //add/remove event listeners
     if(mouseDownEvent.button === 0) { //left button
       mouseDownEvent.preventDefault();
       document.addEventListener("mousemove", handleMouseMove, true);
@@ -244,21 +274,17 @@ export default function MyGraphiQL(props){
 
   return (
     <div>
-      <Grid container className={classes.gridContainer} spacing={0} direction="column" >
+      <Grid container className={classes.gridContainer} wrap='nowrap' spacing={0} direction="column" >
         <div ref={graphiqlElementRef}
           style={{
             height: hasFilter ? "100%" : `calc(100vh - 34px)`,
             width: "100%",
             flex: graphiQLflexGrow,
             WebkitFlex: graphiQLflexGrow,
-            transition: "flex .01s",
-            WebkitTransition: "flex .01s",
-            MozTransition: "flex .01s",
-            OTransition: "flex .01s",
-            transition: "height .05s",
-            WebkitTransition: "height .05s",
-            MozTransition: "height .05s",
-            OTransition: "height .05s",
+            transition: "flex .01s, height .05s",
+            WebkitTransition: "flex .01s, height .05s",
+            MozTransition: "flex .01s, height .05s",
+            OTransition: "flex .01s, height .05s",
           }}
         >
           <GraphiQL
@@ -297,7 +323,7 @@ export default function MyGraphiQL(props){
         
         <div ref={filterElementRef}
           style={{
-            minHeight: 1,
+            minHeight: 34,
             width: "100%",
             flex: "1 1",
             WebkitFlex: "1, 1",
@@ -313,6 +339,7 @@ export default function MyGraphiQL(props){
                 selectedFilter={selectedFilter}
                 filterHeight={filterElementHeight}
                 onInitVerticalResize={onInitVerticalResize}
+                onNewResult={onNewResult}
                 handleFilterSelected={handleFilterSelected}
                 handleRunMetaQuery={handleRunMetaQuery}
                 handleCloseFilter={handleCloseFilter} />
