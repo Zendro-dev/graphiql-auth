@@ -15,4 +15,8 @@
 
 #MetaQueryOutput-box-root .CodeMirror-gutters .CodeMirror-foldgutter {
   padding-left: 3px;
-} 
+}
+
+#MetaQueryOutput-box-root .CodeMirror-scroll {
+  background: #f6f7f8;
+}
