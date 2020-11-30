@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useRef} from 'react';
+import React, {useState, useEffect, useRef, useCallback} from 'react';
 import GraphiQL from 'graphiql';
 import fetch from 'isomorphic-fetch';
 import GraphiQLMetaFilters from './GraphiQLMetaFilters'
@@ -32,6 +32,8 @@ export default function MyGraphiQL(props){
   const selectedFilterRef = useRef("");
   const filterValueRef = useRef("");
   const updateFlexLockRef = useRef(false);
+  const hasFilterRef = useRef(false);
+  const filterLocked = useRef(false);
 
   const graphiQL = useRef(null);
   const filterElementRef = useRef(null);
@@ -94,26 +96,43 @@ export default function MyGraphiQL(props){
   };
 
   /**
+   * Listeners handlers
+   */
+  const handleWindowsResize = () => {
+    //check
+    if(!filterElementRef || !filterElementRef.current) return;
+    if(!hasFilterRef || !hasFilterRef.current) return;
+
+    //update height
+    filterElementHeightRef.current = filterElementRef.current.clientHeight; 
+    setFilterElementHeight(filterElementHeightRef.current);
+  };
+
+  /**
    * Effects
    */
   useEffect(() => {
-    //check
-    if(!filterElementRef || !filterElementRef.current) return;
+    //add event listener
+    window.addEventListener("resize", handleWindowsResize);
 
-    //define resize handler
-    let handleWindowsResize = function () {
-      //check
-      if(!filterElementRef || !filterElementRef.current) return;
-      setFilterElementHeight(filterElementRef.current.clientHeight);
-    };
-    //set filter height
-    if(hasFilter) {
-      setFilterElementHeight((Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0)-34)*(.5));
-      //add event listener
-      window.addEventListener("resize", handleWindowsResize);
-    } else {
+    return function cleanup() {
       //remove event listener
       window.removeEventListener("resize", handleWindowsResize);
+    }
+  }, []);
+
+  useEffect(() => {
+    //update ref
+    hasFilterRef.current = hasFilter;
+    //check
+    if(!filterElementRef || !filterElementRef.current) return;
+    if(!graphiqlElementRef || !graphiqlElementRef.current) return;
+
+    //set filter height
+    if(hasFilter) {
+      let defaultH = (Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0)-34)*(.5);
+      if(!filterElementHeightRef.current) filterElementHeightRef.current = defaultH;
+      setFilterElementHeight(filterElementHeightRef.current);
     }
   }, [hasFilter]);
   
@@ -160,6 +179,10 @@ export default function MyGraphiQL(props){
   };
 
   const handleToggleFilter = () => {
+    //check: lock
+    if(filterLocked.current) return;
+    else filterLocked.current = true;
+
     if(selectedFilterRef.current) {
       //close
       selectedFilterRef.current = "";
@@ -199,9 +222,9 @@ export default function MyGraphiQL(props){
     if(!graphiqlElementRef || !graphiqlElementRef.current) return;
 
     /**
-     * Get GraphiQL variable-editor heigth.
+     * Get GraphiQL variable-editor height.
      * This is needed because when variable-editor is open,
-     * it has a fixed hegiht that not allow the filter-editor
+     * it has a fixed height that not allows the filter-editor
      * to shrink it.
      */
     let veditor = document.getElementsByClassName('variable-editor secondary-editor');
@@ -323,7 +346,7 @@ export default function MyGraphiQL(props){
         
         <div ref={filterElementRef}
           style={{
-            minHeight: 34,
+            minHeight: 0,
             width: "100%",
             flex: "1 1",
             WebkitFlex: "1, 1",
@@ -333,7 +356,20 @@ export default function MyGraphiQL(props){
             OTransition: "flex .01s",
           }}
         >
-          <Slide direction="up" in={hasFilter} mountOnEnter unmountOnExit >
+          <Slide direction="up" in={hasFilter} mountOnEnter unmountOnExit 
+            onEntered={() => {
+              let filterH = filterElementRef.current.clientHeight;
+              //sync height
+              filterElementHeightRef.current = filterH;
+              setFilterElementHeight(filterElementHeightRef.current);
+              //unlock
+              filterLocked.current = false;
+            }}
+            onExited={() => {
+              //unlock
+              filterLocked.current = false;
+            }}
+          >
             <div>
               <GraphiQLMetaFilters 
                 selectedFilter={selectedFilter}
