@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useRef, useCallback} from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import GraphiQL from 'graphiql';
 import fetch from 'isomorphic-fetch';
 import GraphiQLMetaFilters from './GraphiQLMetaFilters'
@@ -252,7 +252,6 @@ export default function MyGraphiQL(props){
       let newFlexGrow = newHeight / newFilterHeight;
       //check limits
       if(newHeight >= (34+veditorHeight) && newHeight <= (maxHeight-34)) {
-        console.log("@@ iniH: ", initialHeight, "nH: ", newHeight, "  minLimit: ", (34+veditorHeight));
         //update flex-grow
         graphiQLflexGrowRef.current = newFlexGrow;
         //update filter height
