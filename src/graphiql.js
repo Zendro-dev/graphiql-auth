@@ -301,8 +301,8 @@ export default function MyGraphiQL(props){
           style={{
             height: hasFilter ? "100%" : `calc(100vh - 34px)`,
             width: "100%",
-            flex: graphiQLflexGrow,
-            WebkitFlex: graphiQLflexGrow,
+            flex: hasFilter ? graphiQLflexGrow : 1,
+            WebkitFlex: hasFilter ? graphiQLflexGrow : 1,
             transition: "flex .01s, height .05s",
             WebkitTransition: "flex .01s, height .05s",
             MozTransition: "flex .01s, height .05s",
@@ -347,8 +347,8 @@ export default function MyGraphiQL(props){
           style={{
             minHeight: 0,
             width: "100%",
-            flex: "1 1",
-            WebkitFlex: "1, 1",
+            flex: hasFilter ? 1 : 0,
+            WebkitFlex: hasFilter ? 1 : 0,
             transition: "flex .01s",
             WebkitTransition: "flex .01s",
             MozTransition: "flex .01s",
