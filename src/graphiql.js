@@ -76,16 +76,16 @@ export default function MyGraphiQL(props){
     }
     //set metaQuery parameters
     let metaQueryParams = {
-      queries:   graphQLParams,
       jq:        selectedFilterRef.current==='jq' ? filterValueRef.current: null,
       jsonPath:  selectedFilterRef.current==='JsonPath' ? filterValueRef.current: null,
     };
     let headers = getHeaders();
+    Object.assign(headers, metaQueryParams)
 
     return fetch(metaquery_url, {
       method: 'post',
       headers: headers,
-      body: JSON.stringify(metaQueryParams),
+      body: JSON.stringify(graphQLParams),
     }).then(response => response.json(), error => {
       console.error("Error:", error);
       return {errors: error.message};
