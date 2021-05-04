@@ -8,7 +8,7 @@ import FormControlLabel from '@material-ui/core/FormControlLabel';
 import FormControl from '@material-ui/core/FormControl';
 import IconButton from '@material-ui/core/IconButton';
 import PlayArrowIcon from '@material-ui/icons/PlayArrow';
-import CloseIcon from '@material-ui/icons/Close';
+import { Close as CloseIcon, InfoOutlined as InfoIcon} from '@material-ui/icons';
 import CodeMirror from 'codemirror';
 import 'codemirror/lib/codemirror.css';
 import 'codemirror/mode/javascript/javascript';
@@ -360,6 +360,12 @@ export default function GraphiQLMetaFilters(props) {
               >
                 Close
               </Button>
+            </Grid>
+            <Grid item style={{padding: 0, marginTop: 8, marginLeft: 10}}>
+              <InfoIcon color='primary'/>
+            </Grid>
+            <Grid item style={{padding: 0, marginTop: 6, marginLeft: 3, whiteSpace:'nowrap'}} >
+              Filters the contents of "data".
             </Grid>
           </Grid>
         </div>
