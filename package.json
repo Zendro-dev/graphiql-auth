@@ -7,15 +7,17 @@
     "@material-ui/icons": "^4.9.1",
     "axios": "^0.19.2",
     "codemirror": "^5.56.0",
-    "graphiql": "^1.0.3",
+    "graphiql": "^1.4.1",
     "graphql": "^15.3.0",
     "isomorphic-fetch": "^2.2.1",
     "jsonlint-mod": "^1.7.5",
     "jwt-decode": "^2.2.0",
     "react": "^16.13.1",
     "react-dom": "^16.13.1",
-    "react-scripts": "^3.4.1",
-    "roboto-fontface": "^0.10.0"
+    "react-scripts": "^4.0.1",
+    "roboto-fontface": "^0.10.0",
+    "graphql-language-service-interface": "2.8.2",
+    "graphql-language-service-parser": "1.9.0"
   },
   "devDependencies": {},
   "scripts": {
