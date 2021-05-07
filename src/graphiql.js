@@ -76,9 +76,9 @@ export default function MyGraphiQL(props){
     }
     //set metaQuery parameters
     let metaQueryParams = {
-      jq:        selectedFilterRef.current==='jq' ? filterValueRef.current: null,
-      jsonPath:  selectedFilterRef.current==='JsonPath' ? filterValueRef.current: null,
-    };
+      ...(selectedFilterRef.current==='jq' && filterValueRef.current && {jq: filterValueRef.current}),
+      ...(selectedFilterRef.current==='JsonPath'&& filterValueRef.current && {jsonPath: filterValueRef.current}),
+    }
     let headers = getHeaders();
     Object.assign(headers, metaQueryParams)
 
