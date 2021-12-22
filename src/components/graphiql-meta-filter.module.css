@@ -1,0 +1,22 @@
+.CodeMirror-lines {
+  padding: 20px 0 !important; /* Vertical padding around content */
+}
+
+#MetaQueryOutput-box-root .CodeMirror-lines {
+  padding-left: 3px !important; /* Vertical padding around content */
+}
+
+#MetaQueryOutput-box-root .CodeMirror-gutters {
+  cursor: col-resize;
+  background-color: #eeeeee;
+  border-color: #e0e0e0;
+  border-left: 1px solid #ddd;
+}
+
+#MetaQueryOutput-box-root .CodeMirror-gutters .CodeMirror-foldgutter {
+  padding-left: 3px;
+}
+
+#MetaQueryOutput-box-root .CodeMirror-scroll {
+  background: #f6f7f8;
+}
