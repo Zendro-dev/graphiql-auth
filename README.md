@@ -4,7 +4,7 @@
 
 ## Description
 
-This application offers a Zendro specific implementation of the browser based GraphQL IDE [Graphiql](). The project is a simple [Next.js](https://nextjs.org/) application. Custom adjustments have been made to accomodate Zendro requirements for authentication of users and enhanced meta searches using [jq] or [JSONPath] statements.
+This application offers a Zendro specific implementation of the browser based GraphQL IDE [Graphiql](https://github.com/graphql/graphiql). The project is a simple [Next.js](https://nextjs.org/) application. Custom adjustments have been made to accomodate Zendro requirements for authentication of users and enhanced meta searches using [jq](https://stedolan.github.io/jq/) or [JSONPath](https://goessner.net/articles/JsonPath/) statements.
 
 ## Configuration
 
