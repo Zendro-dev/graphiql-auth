@@ -6,6 +6,7 @@ const OAUTH2_ISSUER = String(process.env.OAUTH2_ISSUER ?? '');
 const OAUTH2_TOKEN_URI = String(process.env.OAUTH2_TOKEN_URI ?? '');
 const OAUTH2_CLIENT_ID = String(process.env.OAUTH2_CLIENT_ID ?? '');
 const OAUTH2_CLIENT_SECRET = String(process.env.OAUTH2_CLIENT_SECRET ?? '');
+const NEXTAUTH_SECRET = String(process.env.NEXTAUTH_SECRET ?? '');
 
 if (!OAUTH2_TOKEN_URI || !OAUTH2_CLIENT_ID || !OAUTH2_CLIENT_SECRET) {
   throw new Error(
@@ -58,7 +59,7 @@ async function refreshAccessToken(token) {
 }
 
 export default NextAuth({
-  secret: 'my-secret',
+  secret: NEXTAUTH_SECRET,
   // Configure one or more authentication providers
   providers: [
     // ...add more providers here
