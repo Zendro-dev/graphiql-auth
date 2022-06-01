@@ -46,7 +46,7 @@ export default function Home() {
         `}</style>
         <main className={classes.main}>
             <div className={classes.banner} style={{ marginTop: '2rem' }}>
-              <img src="/banner.png" alt="zendro banner" />
+              <img src="/graphiql/banner.png" alt="zendro banner" />
             </div>
               <Button
                 size="large"
