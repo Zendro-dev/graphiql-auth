@@ -275,7 +275,7 @@ export default function Graphiql() {
 								}),
 								React.createElement(GraphiQL.Button, {
 									label: 'Logout',
-									onClick: () =>  signOut({ callbackUrl: '/api/auth/logout' }),
+									onClick: () =>  signOut({ callbackUrl: '/graphiql/api/auth/logout' }),
 									key: "logout-button"
 								}),
 							]
