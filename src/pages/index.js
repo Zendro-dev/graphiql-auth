@@ -5,6 +5,9 @@ import { useSession, signIn, signOut } from "next-auth/react"
 import { Button } from '@mui/material';
 import { Login as LoginIcon } from '@mui/icons-material';
 import ClientOnly from '../components/client-only';
+
+import {BASEPATH} from '../config/globals';
+
 // import '../node_modules/graphiql/graphiql.css';
 const Graphiql = dynamic(
   () => import('../components/graphiql'),
@@ -46,7 +49,7 @@ export default function Home() {
         `}</style>
         <main className={classes.main}>
             <div className={classes.banner} style={{ marginTop: '2rem' }}>
-              <img src="/graphiql/banner.png" alt="zendro banner" />
+              <img src={ `${BASEPATH}/banner.png` } alt="zendro banner" />
             </div>
               <Button
                 size="large"

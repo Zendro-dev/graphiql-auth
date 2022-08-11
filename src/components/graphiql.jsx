@@ -7,7 +7,7 @@ import { useSession, signOut } from "next-auth/react"
 import { makeStyles } from '@mui/styles';
 import { Grid, Slide } from '@mui/material'
 
-import { GRAPHQL_URL, METAQUERY_URL} from '../config/globals';
+import { GRAPHQL_URL, METAQUERY_URL, BASEPATH} from '../config/globals';
 
 import GraphiQLMetaFilter from './graphiql-meta-filter';
 
@@ -132,7 +132,6 @@ export default function Graphiql() {
   };
 
 	const handleToggleFilter = () => {
-		console.log("YAA")
     //check: lock
     if(filterLocked.current) return;
     else filterLocked.current = true;
@@ -275,7 +274,7 @@ export default function Graphiql() {
 								}),
 								React.createElement(GraphiQL.Button, {
 									label: 'Logout',
-									onClick: () =>  signOut({ callbackUrl: '/graphiql/api/auth/logout' }),
+									onClick: () =>  signOut({ callbackUrl: `${BASEPATH}/api/auth/logout`}),
 									key: "logout-button"
 								}),
 							]
