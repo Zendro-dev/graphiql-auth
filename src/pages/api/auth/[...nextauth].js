@@ -4,6 +4,7 @@ import { decode } from 'next-auth/jwt';
 
 const OAUTH2_ISSUER = String(process.env.OAUTH2_ISSUER ?? '');
 const OAUTH2_TOKEN_URI = String(process.env.OAUTH2_TOKEN_URI ?? '');
+const OAUTH2_AUTH_URI = String(process.env.OAUTH2_AUTH_URI ?? '');
 const OAUTH2_CLIENT_ID = String(process.env.OAUTH2_CLIENT_ID ?? '');
 const OAUTH2_CLIENT_SECRET = String(process.env.OAUTH2_CLIENT_SECRET ?? '');
 const NEXTAUTH_SECRET = String(process.env.NEXTAUTH_SECRET ?? '');
@@ -58,27 +59,45 @@ async function refreshAccessToken(token) {
   }
 }
 
+// In case your oauth provider does _not_ support OIDC, you can use the
+// OAUTH2_AUTH_URI instead of the OAUTH2_ISSUER environment variable to setup
+// your provider. See
+// https://next-auth.js.org/configuration/providers/oauth#using-a-custom-provider
+// for more info and in case your provider needs some more configuration.
+const defaultProvider =
+  !OAUTH2_ISSUER && OAUTH2_AUTH_URI
+    ? {
+        id: 'zendro',
+        name: 'zendro',
+        type: 'oauth',
+        authorization: OAUTH2_AUTH_URI,
+        token: OAUTH2_TOKEN_URI,
+      }
+    : {
+        id: 'zendro',
+        name: 'zendro',
+        type: 'oauth',
+        wellKnown: `${OAUTH2_ISSUER}/.well-known/openid-configuration`, // for OpenID connect clients. If your OAuth provider
+        // does not implement OpenID connect you need to manually configure your endpoints.
+        // See https://next-auth.js.org/configuration/providers/oauth#using-a-custom-provider
+        clientId: OAUTH2_CLIENT_ID,
+        clientSecret: OAUTH2_CLIENT_SECRET,
+        checks: ['state', 'pkce'],
+        idToken: true,
+        profile(profile) {
+          return {
+            id: profile.sub,
+            name: profile.name ?? profile.preferred_username,
+          };
+        },
+      };
+
 export default NextAuth({
   secret: NEXTAUTH_SECRET,
   // Configure one or more authentication providers
   providers: [
     // ...add more providers here
-    {
-      id: 'zendro',
-      name: 'zendro',
-      type: 'oauth',
-      wellKnown: `${OAUTH2_ISSUER}/.well-known/openid-configuration`, // OpenID spec
-      clientId: OAUTH2_CLIENT_ID,
-      clientSecret: OAUTH2_CLIENT_SECRET,
-      checks: ['state', 'pkce'],
-      idToken: true,
-      profile(profile) {
-        return {
-          id: profile.sub,
-          name: profile.name ?? profile.preferred_username,
-        };
-      },
-    },
+    defaultProvider,
   ],
   // debug: true,
   callbacks: {
@@ -93,7 +112,7 @@ export default NextAuth({
       // Return previous token if the access token has not expired yet
       if (
         token.accessTokenExpires &&
-        Date.now() < token.accessTokenExpires - 60 * 1000
+        Date.now() < token.accessTokenExpires - 60 * 5 * 1000
       ) {
         return token;
       }

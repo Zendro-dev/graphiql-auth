@@ -7,7 +7,7 @@ import { useSession, signOut } from "next-auth/react"
 import { makeStyles } from '@mui/styles';
 import { Grid, Slide } from '@mui/material'
 
-import { GRAPHQL_URL, METAQUERY_URL} from '../config/globals';
+import { GRAPHQL_URL, METAQUERY_URL, BASEPATH} from '../config/globals';
 
 import GraphiQLMetaFilter from './graphiql-meta-filter';
 
@@ -39,6 +39,10 @@ export default function Graphiql() {
   const graphiQL = useRef(null);
   const filterElementRef = useRef(null);
   const graphiqlElementRef = useRef(null);
+
+  const [editorQuery, setEditorQuery] = useState("");
+  const [editorVariables, setEditorVariables] = useState("");
+  const [editorOperationName, setEditorOperationName] = useState({});
 
 	const fetcher = createGraphiQLFetcher({
 		url: GRAPHQL_URL,
@@ -118,21 +122,20 @@ export default function Graphiql() {
   }, [hasFilter]);
 
   const handleRunMetaQuery = async (filter) => {
-    //check
     if(!graphiQL || !graphiQL.current) return;
+    if(editorQuery === "") return;
     //set meta-filter
     filterValueRef.current = filter ? filter : null;
     //graphql params
     let graphQLParams = {
-      query: graphiQL.current.state.query,
-      operationName: graphiQL.current.state.operationName,
-      variables: graphiQL.current.state.variables ? JSON.parse(graphiQL.current.state.variables) : null,
+      query: editorQuery,
+      operationName: editorOperationName,
+      variables: editorVariables ? JSON.parse(editorVariables) : null,
     }
     return graphQLMetaFetcher(graphQLParams).catch((err) => {console.log("Error:", err); return {error: err.message}});
   };
 
 	const handleToggleFilter = () => {
-		console.log("YAA")
     //check: lock
     if(filterLocked.current) return;
     else filterLocked.current = true;
@@ -265,7 +268,13 @@ export default function Graphiql() {
 					}}
 					key="graphiqlElement"
         >
-          <GraphiQL ref={graphiQL} fetcher={fetcher} toolbar={
+          <GraphiQL
+            onEditQuery={(newValue) => setEditorQuery(newValue)}
+            onEditVariables={(newValue) => setEditorVariables((newValue))}
+            onEditOperationName={(newValue) => setEditorOperationName(newValue)}
+            ref={graphiQL}
+            fetcher={fetcher}
+            toolbar={
 						{
 							additionalContent: [
 								React.createElement(GraphiQL.Button, {
@@ -275,7 +284,7 @@ export default function Graphiql() {
 								}),
 								React.createElement(GraphiQL.Button, {
 									label: 'Logout',
-									onClick: () =>  signOut({ callbackUrl: '/graphiql/api/auth/logout' }),
+									onClick: () =>  signOut({ callbackUrl: `${BASEPATH}/api/auth/logout`}),
 									key: "logout-button"
 								}),
 							]

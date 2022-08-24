@@ -1,8 +1,16 @@
+const BASEPATH = String(
+  process.env.NEXT_PUBLIC_ZENDRO_BASEPATH
+    ? process.env.NEXT_PUBLIC_ZENDRO_BASEPATH.replace(
+        /\/*([a-zA-Z]+)\/*/g,
+        '/$1'
+      )
+    : ''
+);
+
 const config = {
-  webpack5: true,
-  reactStrictMode: true,
-  basePath: '/graphiql',
+  reactStrictMode: false,
   staticPageGenerationTimeout: 1000,
+  ...(BASEPATH && { basePath: BASEPATH }),
 };
 
 module.exports = config;
