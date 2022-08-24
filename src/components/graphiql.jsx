@@ -40,6 +40,10 @@ export default function Graphiql() {
   const filterElementRef = useRef(null);
   const graphiqlElementRef = useRef(null);
 
+  const [editorQuery, setEditorQuery] = useState("");
+  const [editorVariables, setEditorVariables] = useState("");
+  const [editorOperationName, setEditorOperationName] = useState({});
+
 	const fetcher = createGraphiQLFetcher({
 		url: GRAPHQL_URL,
 		headers: {
@@ -118,15 +122,15 @@ export default function Graphiql() {
   }, [hasFilter]);
 
   const handleRunMetaQuery = async (filter) => {
-    //check
     if(!graphiQL || !graphiQL.current) return;
+    if(editorQuery === "") return;
     //set meta-filter
     filterValueRef.current = filter ? filter : null;
     //graphql params
     let graphQLParams = {
-      query: graphiQL.current.state.query,
-      operationName: graphiQL.current.state.operationName,
-      variables: graphiQL.current.state.variables ? JSON.parse(graphiQL.current.state.variables) : null,
+      query: editorQuery,
+      operationName: editorOperationName,
+      variables: editorVariables ? JSON.parse(editorVariables) : null,
     }
     return graphQLMetaFetcher(graphQLParams).catch((err) => {console.log("Error:", err); return {error: err.message}});
   };
@@ -264,7 +268,13 @@ export default function Graphiql() {
 					}}
 					key="graphiqlElement"
         >
-          <GraphiQL ref={graphiQL} fetcher={fetcher} toolbar={
+          <GraphiQL
+            onEditQuery={(newValue) => setEditorQuery(newValue)}
+            onEditVariables={(newValue) => setEditorVariables((newValue))}
+            onEditOperationName={(newValue) => setEditorOperationName(newValue)}
+            ref={graphiQL}
+            fetcher={fetcher}
+            toolbar={
 						{
 							additionalContent: [
 								React.createElement(GraphiQL.Button, {
