@@ -1,5 +1,4 @@
-
-import { BASEPATH } from '../config/globals';
+import { BASEPATH } from '../../../config/globals';
 
 const OAUTH2_ISSUER = String(process.env.OAUTH2_ISSUER ?? '');
 const NEXTAUTH_URL = String(process.env.NEXTAUTH_URL ?? '');
