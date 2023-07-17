@@ -1,11 +1,11 @@
 {
   "private": true,
   "scripts": {
-    "dev": "next dev -p ${PORT:-7000}",
-    "dev:win": "next dev -p 7000",
+    "dev": "next dev -p ${PORT:-7070}",
+    "dev:win": "next dev -p 7070",
     "build": "next build",
-    "start": "next start -p ${PORT:-7000}",
-    "start:win": "next start -p 7000"
+    "start": "next start -p ${PORT:-7070}",
+    "start:win": "next start -p 7070"
   },
   "dependencies": {
     "@emotion/react": "^11.10.0",
