@@ -15,21 +15,20 @@ const ORIGIN = process.env.ORIGIN || `http://localhost:${PORT}`;
 // The graphql-server this GraphiQL deployment talks to - /graphql,
 // /meta_query and /auth/* are all derived from this one origin. gqs is the
 // only service with real Keycloak credentials: it must be registered
-// (GRAPHIQL_REDIRECT_URI on gqs's own .env) to allow running login on this
+// (AUTH_REDIRECT_URI on gqs's own .env) to allow running login on this
 // app's behalf - see zendro-graphiql's README, "Acting as an auth backend
 // for other origins".
 const ZENDRO_SERVER_URL = process.env.ZENDRO_SERVER_URL;
 const GRAPHQL_URL = ZENDRO_SERVER_URL && `${ZENDRO_SERVER_URL}/graphql`;
 const FILTER_ENABLED = process.env.GRAPHIQL_FILTER_ENABLED === "true";
 const METAQUERY_URL = FILTER_ENABLED && ZENDRO_SERVER_URL ? `${ZENDRO_SERVER_URL}/meta_query` : undefined;
-// Where gqs's own GraphiQL (and its /auth/* routes) are mounted - the
-// zendro-graphiql default, only worth overriding if gqs itself was
-// configured with a non-default mountPath.
-const AUTH_PATH = process.env.ZENDRO_AUTH_PATH || "/graphiql/auth";
+// Where gqs runs its top-level auth backend (see zendro-graphiql's
+// authRouter()) - a fixed path, independent of gqs's own GraphiQL mount;
+// only worth overriding if something in front of gqs rewrites it.
+const AUTH_PATH = process.env.ZENDRO_AUTH_PATH || "/auth";
 const AUTH_BASE_URL = ZENDRO_SERVER_URL && `${ZENDRO_SERVER_URL}${AUTH_PATH}`;
 
 const graphiqlOptions = {
-  mountPath: "/",
   features: {
     // proxied: this app holds no Keycloak credentials of its own - /auth/*
     // is reverse-proxied to gqs below. Only the login/logout UI is

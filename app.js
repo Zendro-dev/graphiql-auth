@@ -1,6 +1,6 @@
 const express = require("express");
 const cors = require("cors");
-const GraphiQL = require("zendro-graphiql");
+const { GraphiQL } = require("zendro-graphiql");
 
 // This deployment lives on its own origin, separate from the actual
 // graphql-server it talks to (unlike graphql-server's own integration,

@@ -21,7 +21,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const express = require("express");
 const cors = require("cors");
-const GraphiQL = require("zendro-graphiql");
+const { GraphiQL, authRouter, attachAuthFromSession } = require("zendro-graphiql");
 const createApp = require("../../app");
 const { closeServer } = require("../helpers/fakeUpstream");
 
@@ -111,7 +111,7 @@ async function startGqsStandin() {
         // Never actually used - every request in this test carries the
         // X-Zendro-Auth-Redirect-Uri override below, but a value is still
         // required to construct the router.
-        redirectUri: "http://gqs-standin.invalid/graphiql/auth/callback",
+        redirectUri: "http://gqs-standin.invalid/auth/callback",
         allowedRedirectUris: [`${ORIGIN}/*`],
         sessionSecret: SESSION_SECRET,
       },
@@ -119,7 +119,8 @@ async function startGqsStandin() {
   };
   const app = express();
   app.use("/graphiql", GraphiQL(graphiqlOptions));
-  const attachGraphiqlSession = GraphiQL.attachAuthFromSession(graphiqlOptions);
+  app.use("/auth", authRouter(graphiqlOptions));
+  const attachGraphiqlSession = attachAuthFromSession(graphiqlOptions);
   app.all("/graphql", cors(), attachGraphiqlSession, (req, res) => res.json({ authHeader: req.headers.authorization || null }));
   const server = await new Promise((resolve) => {
     const s = app.listen(0, () => resolve(s));
@@ -141,9 +142,9 @@ test("live login against a real Keycloak, proxied through this app to a gqs stan
 
   const app = createApp({
     graphqlUrl: `${gqs.url}/graphql`,
-    authBaseUrl: `${gqs.url}/graphiql/auth`,
+    authBaseUrl: `${gqs.url}/auth`,
     redirectUri: REDIRECT_URI,
-    graphiqlOptions: { mountPath: "/", features: { auth: { enabled: true, proxied: true } } },
+    graphiqlOptions: { features: { auth: { enabled: true, proxied: true } } },
   });
   const port = Number(new URL(REDIRECT_URI).port) || 80;
   const server = await new Promise((resolve, reject) => {

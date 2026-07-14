@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const net = require("node:net");
 const express = require("express");
 const cors = require("cors");
-const GraphiQL = require("zendro-graphiql");
+const { GraphiQL, authRouter, attachAuthFromSession } = require("zendro-graphiql");
 const createApp = require("../app");
 const { startFakeIdp } = require("./helpers/fakeIdp");
 const { startFakeUpstream, closeServer } = require("./helpers/fakeUpstream");
@@ -18,10 +18,11 @@ function getEphemeralPort() {
   });
 }
 
-// Stands in for graphql-server's own GraphiQL wiring (see its server.js):
-// GraphiQL(...) mounted at /graphiql (real auth router, real allowlist),
-// attachAuthFromSession wired into its own /graphql. This app.js has none
-// of that - it reverse-proxies to something shaped exactly like this.
+// Stands in for graphql-server's own wiring (see its server.js):
+// GraphiQL(...) mounted at /graphiql, authRouter(...) mounted at the
+// top-level /auth (real allowlist), attachAuthFromSession wired into its
+// own /graphql. This app.js has none of that - it reverse-proxies to
+// something shaped exactly like this.
 async function startFakeGqs(idp, allowedRedirectUris) {
   const graphiqlOptions = {
     features: {
@@ -30,7 +31,7 @@ async function startFakeGqs(idp, allowedRedirectUris) {
         clientId: "zendro_graphiql",
         clientSecret: "test-secret",
         issuerUri: idp.issuer,
-        redirectUri: "http://gqs.example/graphiql/auth/callback",
+        redirectUri: "http://gqs.example/auth/callback",
         allowedRedirectUris,
         sessionSecret: "gqs-session-secret",
       },
@@ -38,7 +39,8 @@ async function startFakeGqs(idp, allowedRedirectUris) {
   };
   const app = express();
   app.use("/graphiql", GraphiQL(graphiqlOptions));
-  const attachGraphiqlSession = GraphiQL.attachAuthFromSession(graphiqlOptions);
+  app.use("/auth", authRouter(graphiqlOptions));
+  const attachGraphiqlSession = attachAuthFromSession(graphiqlOptions);
   app.all("/graphql", cors(), attachGraphiqlSession, (req, res) => res.json({ authHeader: req.headers.authorization || null }));
   const server = await new Promise((resolve) => {
     const s = app.listen(0, () => resolve(s));
@@ -60,7 +62,7 @@ test("app: GraphiQL served at / and /graphql, /meta_query proxy to the upstream"
   const app = createApp({
     graphqlUrl: upstream.url,
     metaQueryUrl: `${upstream.url}/meta_query`,
-    graphiqlOptions: { mountPath: "/", features: { auth: { enabled: true, proxied: true }, filter: { enabled: true } } },
+    graphiqlOptions: { features: { auth: { enabled: true, proxied: true }, filter: { enabled: true } } },
   });
   const server = await new Promise((resolve) => {
     const s = app.listen(0, () => resolve(s));
@@ -129,9 +131,9 @@ test("app: /auth/* proxies to graphql-server, which runs the real OAuth2 flow on
 
   const app = createApp({
     graphqlUrl: `${gqs.url}/graphql`,
-    authBaseUrl: `${gqs.url}/graphiql/auth`,
+    authBaseUrl: `${gqs.url}/auth`,
     redirectUri: `${ownOrigin}/auth/callback`,
-    graphiqlOptions: { mountPath: "/", features: { auth: { enabled: true, proxied: true } } },
+    graphiqlOptions: { features: { auth: { enabled: true, proxied: true } } },
   });
   const server = await new Promise((resolve, reject) => {
     const s = app.listen(ownPort, () => resolve(s));
