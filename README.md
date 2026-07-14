@@ -4,11 +4,13 @@
 
 ## Description
 
-This is a thin Express server ([server.js](./server.js)) that mounts [zendro-graphiql](https://github.com/Zendro-dev/zendro-graphiql) at its root, with both of its optional features - OAuth2 login and the jq/JSONPath filter panel - enabled. It talks to a `graphql-server` running elsewhere (a different origin/host), so unlike `graphql-server`'s own built-in `/graphiql`, `/graphql` and `/meta_query` here are reverse proxy routes: the browser only ever talks to this app's origin, and the OAuth2 session's token is injected server-side right before forwarding upstream - it never reaches the browser.
+This is a thin Express server ([server.js](./server.js)) that mounts [zendro-graphiql](https://github.com/Zendro-dev/zendro-graphiql) at its root, with both of its optional features - OAuth2 login and the jq/JSONPath filter panel - enabled. It talks to a `graphql-server` running elsewhere (a different origin/host), so unlike `graphql-server`'s own built-in `/graphiql`, `/graphql`, `/meta_query` **and `/auth/*`** here are all reverse proxy routes: the browser only ever talks to this app's origin.
+
+This app holds no Keycloak credentials of its own. `graphql-server` is the only service that needs to know about the identity provider - it already owns authorization (ACL), so it makes sense for it to own authentication too. Login/logout here just reverse-proxies to `graphql-server`'s own `/graphiql/auth/*`, the same way `/graphql` and `/meta_query` already do; see [zendro-graphiql](https://github.com/Zendro-dev/zendro-graphiql)'s README, "Acting as an auth backend for other origins", for how that's wired up and why it's still safe to do across origins (the session cookie stays scoped to *this* app's origin from the browser's point of view - it's never exposed to a different origin, cross-site, or otherwise handled any differently than before).
 
 ## Configuration
 
-Copy `.env.example` to `.env` and fill in the values - see the comments in that file for what each variable does. At minimum you need `ZENDRO_SERVER_URL` pointing at the target `graphql-server`'s origin; the OAuth2 variables are required since login is always enabled here (see [zendro-graphiql](https://github.com/Zendro-dev/zendro-graphiql)'s README for what each one configures). `PORT` and `ZENDRO_SERVER_URL` are the two variables you're likely to actually change - `OAUTH2_REDIRECT_URI` and the `/graphql`+`/meta_query` URLs are derived from them at runtime rather than needing to be kept in sync by hand.
+Copy `.env.example` to `.env` and fill in the values - see the comments in that file for what each variable does. At minimum you need `ZENDRO_SERVER_URL` pointing at the target `graphql-server`'s origin, and that `graphql-server` needs `GRAPHIQL_REDIRECT_URI` (its own `.env`) to include this app's origin (e.g. `http://localhost:7070/*`) so it accepts running login on this app's behalf. `PORT` and `ZENDRO_SERVER_URL` are the two variables you're likely to actually change - the redirect URI and the `/graphql`+`/meta_query`+`/auth` URLs are all derived from them at runtime rather than needing to be kept in sync by hand.
 
 ## Development
 

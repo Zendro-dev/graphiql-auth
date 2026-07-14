@@ -1,10 +1,17 @@
 // Unlike the rest of the suite (which fakes the identity provider), this
-// talks to a REAL, already-running Keycloak - the same one this app's own
-// .env is configured against. It exists to catch the class of bug unit
-// tests can't: wrong ports/hostnames, a misregistered redirect URI, a
-// realm/client that doesn't actually accept this app's config. /graphql
-// itself is still a local fake upstream, so no real graphql-server is
-// required - only Keycloak.
+// talks to a REAL, already-running Keycloak. It exists to catch the class
+// of bug unit tests can't: wrong ports/hostnames, a misregistered redirect
+// URI, a realm/client that doesn't actually accept this config.
+//
+// This app has no Keycloak credentials of its own (see app.js/server.js) -
+// /auth/* is reverse-proxied to graphql-server, which owns the real OAuth2
+// flow. Since booting a real graphql-server needs generated resolvers/
+// schemas and a database (out of scope for this checkout), a "gqs
+// stand-in" is spun up here using the same zendro-graphiql package graphql-
+// server itself uses, wired up the same way (see its server.js): a real,
+// non-proxied auth router talking to the real Keycloak, plus a stub
+// /graphql that echoes the Authorization header it received so the test
+// can assert on it.
 //
 // Skips itself (rather than failing) whenever the configured Keycloak isn't
 // reachable, so it never breaks CI or a machine that doesn't have the
@@ -12,8 +19,11 @@
 require("dotenv").config();
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const express = require("express");
+const cors = require("cors");
+const GraphiQL = require("zendro-graphiql");
 const createApp = require("../../app");
-const { startFakeUpstream, closeServer } = require("../helpers/fakeUpstream");
+const { closeServer } = require("../helpers/fakeUpstream");
 
 const ISSUER_URI = process.env.OAUTH2_ISSUER_URI;
 // Only needed when ISSUER_URI isn't reachable from here directly (e.g. a
@@ -87,7 +97,37 @@ async function performKeycloakLogin(authorizeUrl) {
   return location;
 }
 
-test("live login against a real Keycloak", { skip: !ISSUER_URI || !CLIENT_SECRET }, async (t) => {
+// See the file header - stands in for a real graphql-server's own GraphiQL
+// wiring, the thing this app's /auth/* and /graphql actually proxy to.
+async function startGqsStandin() {
+  const graphiqlOptions = {
+    features: {
+      auth: {
+        enabled: true,
+        clientId: CLIENT_ID,
+        clientSecret: CLIENT_SECRET,
+        issuerUri: ISSUER_URI,
+        issuerInternalUri: ISSUER_INTERNAL_URI,
+        // Never actually used - every request in this test carries the
+        // X-Zendro-Auth-Redirect-Uri override below, but a value is still
+        // required to construct the router.
+        redirectUri: "http://gqs-standin.invalid/graphiql/auth/callback",
+        allowedRedirectUris: [`${ORIGIN}/*`],
+        sessionSecret: SESSION_SECRET,
+      },
+    },
+  };
+  const app = express();
+  app.use("/graphiql", GraphiQL(graphiqlOptions));
+  const attachGraphiqlSession = GraphiQL.attachAuthFromSession(graphiqlOptions);
+  app.all("/graphql", cors(), attachGraphiqlSession, (req, res) => res.json({ authHeader: req.headers.authorization || null }));
+  const server = await new Promise((resolve) => {
+    const s = app.listen(0, () => resolve(s));
+  });
+  return { server, url: `http://localhost:${server.address().port}` };
+}
+
+test("live login against a real Keycloak, proxied through this app to a gqs stand-in", { skip: !ISSUER_URI || !CLIENT_SECRET }, async (t) => {
   if (!ISSUER_URI || !CLIENT_SECRET) return;
 
   const reachable = await isReachable(`${ISSUER_INTERNAL_URI || ISSUER_URI}/.well-known/openid-configuration`);
@@ -96,27 +136,15 @@ test("live login against a real Keycloak", { skip: !ISSUER_URI || !CLIENT_SECRET
     return;
   }
 
-  const upstream = await startFakeUpstream((req, res) => {
-    res.setHeader("Content-Type", "application/json");
-    res.end(JSON.stringify({ data: { __typename: "Query" } }));
-  });
-  t.after(() => closeServer(upstream.server));
+  const gqs = await startGqsStandin();
+  t.after(() => closeServer(gqs.server));
 
-  const graphiqlOptions = {
-    mountPath: "/",
-    features: {
-      auth: {
-        enabled: true,
-        clientId: CLIENT_ID,
-        clientSecret: CLIENT_SECRET,
-        issuerUri: ISSUER_URI,
-        issuerInternalUri: ISSUER_INTERNAL_URI,
-        redirectUri: REDIRECT_URI,
-        sessionSecret: SESSION_SECRET,
-      },
-    },
-  };
-  const app = createApp({ graphqlUrl: upstream.url, graphiqlOptions });
+  const app = createApp({
+    graphqlUrl: `${gqs.url}/graphql`,
+    authBaseUrl: `${gqs.url}/graphiql/auth`,
+    redirectUri: REDIRECT_URI,
+    graphiqlOptions: { mountPath: "/", features: { auth: { enabled: true, proxied: true } } },
+  });
   const port = Number(new URL(REDIRECT_URI).port) || 80;
   const server = await new Promise((resolve, reject) => {
     const s = app.listen(port, () => resolve(s));
@@ -133,13 +161,13 @@ test("live login against a real Keycloak", { skip: !ISSUER_URI || !CLIENT_SECRET
     const loginRes = await fetch(`${base}/auth/login`, { redirect: "manual" });
     absorbSetCookie(appJar, loginRes);
     const authorizeUrl = loginRes.headers.get("location");
-    assert.ok(authorizeUrl?.startsWith(ISSUER_URI), "expected /auth/login to redirect into the configured Keycloak realm");
+    assert.ok(authorizeUrl?.startsWith(ISSUER_URI), "expected /auth/login (proxied to gqs) to redirect into the configured Keycloak realm");
 
     const redirectBack = await performKeycloakLogin(authorizeUrl);
-    assert.ok(redirectBack.startsWith(REDIRECT_URI), "expected Keycloak to redirect back to our configured redirect_uri");
+    assert.ok(redirectBack.startsWith(REDIRECT_URI), "expected Keycloak to redirect back to this app's own redirect_uri, not gqs's");
 
     const callbackRes = await fetch(redirectBack, { redirect: "manual", headers: { cookie: cookieHeader(appJar) } });
-    assert.equal(callbackRes.status, 302, "expected the callback to create a session and redirect to mountPath");
+    assert.equal(callbackRes.status, 302, "expected the callback to create a session and redirect back to this app's root");
     absorbSetCookie(appJar, callbackRes);
     assert.ok(appJar.zendro_giql_session, "expected a session cookie to be set");
 
@@ -148,18 +176,20 @@ test("live login against a real Keycloak", { skip: !ISSUER_URI || !CLIENT_SECRET
       headers: { cookie: cookieHeader(appJar), "Content-Type": "application/json" },
       body: JSON.stringify({ query: "{ __typename }" }),
     });
-    const responseBody = await graphqlRes.text();
+    // The fake gqs's /graphql deliberately echoes the Authorization header
+    // back so this can be asserted on - a real graphql-server never would.
+    const { authHeader } = await graphqlRes.json();
 
-    const forwarded = upstream.requests.at(-1);
-    assert.match(forwarded.headers.authorization || "", /^Bearer /, "expected the real access token to be attached server-side");
-    const token = forwarded.headers.authorization.replace("Bearer ", "");
+    assert.match(authHeader || "", /^Bearer /, "expected the real access token to be attached server-side, by gqs, not this app");
+    const token = authHeader.replace("Bearer ", "");
     assert.equal(token.split(".").length, 3, "expected a JWT access token");
     const payload = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString());
     assert.equal(payload.preferred_username, TEST_USERNAME);
 
     // The whole point of the BFF pattern: the token must never appear
-    // anywhere the browser can see it, even on a real, live login.
-    assert.doesNotMatch(responseBody, new RegExp(token.replace(/[.]/g, "\\.")));
+    // anywhere the browser can see it, even on a real, live login - and
+    // this app, proxying blind, never even gets a chance to leak it since
+    // it never looks at the session cookie's contents at all.
     for (const cookieValue of Object.values(appJar)) {
       assert.doesNotMatch(decodeURIComponent(cookieValue), new RegExp(token.replace(/[.]/g, "\\.")));
     }
