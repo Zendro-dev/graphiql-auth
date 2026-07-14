@@ -16,6 +16,9 @@ const createApp = require("../../app");
 const { startFakeUpstream, closeServer } = require("../helpers/fakeUpstream");
 
 const ISSUER_URI = process.env.OAUTH2_ISSUER_URI;
+// Only needed when ISSUER_URI isn't reachable from here directly (e.g. a
+// dockerized Keycloak reachable only via its internal service hostname).
+const ISSUER_INTERNAL_URI = process.env.OAUTH2_ISSUER_INTERNAL_URI;
 const CLIENT_ID = process.env.OAUTH2_CLIENT_ID || "zendro_graphiql";
 const CLIENT_SECRET = process.env.OAUTH2_CLIENT_SECRET;
 const SESSION_SECRET = process.env.SESSION_SECRET || "live-test-session-secret";
@@ -87,9 +90,9 @@ async function performKeycloakLogin(authorizeUrl) {
 test("live login against a real Keycloak", { skip: !ISSUER_URI || !CLIENT_SECRET }, async (t) => {
   if (!ISSUER_URI || !CLIENT_SECRET) return;
 
-  const reachable = await isReachable(`${ISSUER_URI}/.well-known/openid-configuration`);
+  const reachable = await isReachable(`${ISSUER_INTERNAL_URI || ISSUER_URI}/.well-known/openid-configuration`);
   if (!reachable) {
-    t.skip(`Keycloak at ${ISSUER_URI} is not reachable - is the Zendro dev stack running?`);
+    t.skip(`Keycloak at ${ISSUER_INTERNAL_URI || ISSUER_URI} is not reachable - is the Zendro dev stack running?`);
     return;
   }
 
@@ -107,6 +110,7 @@ test("live login against a real Keycloak", { skip: !ISSUER_URI || !CLIENT_SECRET
         clientId: CLIENT_ID,
         clientSecret: CLIENT_SECRET,
         issuerUri: ISSUER_URI,
+        issuerInternalUri: ISSUER_INTERNAL_URI,
         redirectUri: REDIRECT_URI,
         sessionSecret: SESSION_SECRET,
       },

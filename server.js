@@ -26,6 +26,12 @@ const graphiqlOptions = {
       clientId: process.env.OAUTH2_CLIENT_ID || "zendro_graphiql",
       clientSecret: process.env.OAUTH2_CLIENT_SECRET,
       issuerUri: process.env.OAUTH2_ISSUER_URI,
+      // Only needed when the issuer's own public hostname (above) isn't
+      // network-reachable from here - e.g. Keycloak in Docker Compose,
+      // where OAUTH2_ISSUER_URI is the host's published port (matching
+      // what Keycloak's fixed KC_HOSTNAME reports as its issuer) but this
+      // server must actually connect via the internal service hostname.
+      issuerInternalUri: process.env.OAUTH2_ISSUER_INTERNAL_URI,
       redirectUri: `${ORIGIN}/auth/callback`,
       sessionSecret: process.env.SESSION_SECRET,
     },
