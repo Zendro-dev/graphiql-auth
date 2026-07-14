@@ -11,11 +11,9 @@ const graphiqlOptions = {
   features: {
     auth: {
       enabled: true,
-      clientId: process.env.OAUTH2_GRAPHIQL_CLIENT_ID || "zendro_graphiql",
-      clientSecret: process.env.OAUTH2_GRAPHIQL_CLIENT_SECRET,
-      authorizationUri: process.env.OAUTH2_AUTHORIZATION_URI,
-      tokenUri: process.env.OAUTH2_TOKEN_URI,
-      logoutUri: process.env.OAUTH2_LOGOUT_URI,
+      clientId: process.env.OAUTH2_CLIENT_ID || "zendro_graphiql",
+      clientSecret: process.env.OAUTH2_CLIENT_SECRET,
+      issuerUri: process.env.OAUTH2_ISSUER_URI,
       redirectUri: process.env.OAUTH2_REDIRECT_URI,
       sessionSecret: process.env.SESSION_SECRET,
     },

@@ -1,43 +1,18 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const http = require("node:http");
 const createApp = require("../app");
+const { startFakeIdp } = require("./helpers/fakeIdp");
+const { startFakeUpstream, closeServer } = require("./helpers/fakeUpstream");
 
 const authConfig = {
   clientId: "zendro_graphiql",
   clientSecret: "test-secret",
-  authorizationUri: "http://keycloak.example/auth",
-  tokenUri: "http://keycloak.example/token",
+  // Never actually contacted by the tests in this file that don't exercise
+  // /auth/login or /auth/callback - discovery only happens lazily.
+  issuerUri: "http://keycloak.example",
   redirectUri: "http://localhost:0/auth/callback",
   sessionSecret: "session-signing-secret",
-  logoutUri: "http://keycloak.example/logout",
 };
-
-// A fake upstream graphql-server: records every request it receives so
-// tests can assert on what the proxy actually forwarded.
-function startFakeUpstream(responder) {
-  return new Promise((resolve) => {
-    const requests = [];
-    const server = http.createServer((req, res) => {
-      const chunks = [];
-      req.on("data", (c) => chunks.push(c));
-      req.on("end", () => {
-        requests.push({
-          method: req.method,
-          url: req.url,
-          headers: req.headers,
-          body: Buffer.concat(chunks).toString("utf8"),
-        });
-        responder(req, res);
-      });
-    });
-    server.listen(0, () => resolve({ server, requests, url: `http://localhost:${server.address().port}` }));
-  });
-}
-
-function closeServer(server) {
-  return new Promise((resolve) => server.close(resolve));
-}
 
 test("createApp requires graphqlUrl", () => {
   assert.throws(() => createApp({ graphiqlOptions: {} }), /graphqlUrl is required/);
@@ -116,17 +91,14 @@ test("app: a logged-in session gets its token injected into proxied /graphql req
   });
   t.after(() => closeServer(upstream.server));
 
-  const tokenServer = await startFakeUpstream((req, res) => {
-    res.setHeader("Content-Type", "application/json");
-    res.end(JSON.stringify({ access_token: "fake-access-token", refresh_token: "fake-refresh", expires_in: 3600 }));
-  });
-  t.after(() => closeServer(tokenServer.server));
+  const idp = await startFakeIdp();
+  t.after(() => idp.close());
 
   const app = createApp({
     graphqlUrl: upstream.url,
     graphiqlOptions: {
       mountPath: "/",
-      features: { auth: { enabled: true, ...authConfig, tokenUri: `${tokenServer.url}/token` } },
+      features: { auth: { enabled: true, ...authConfig, issuerUri: idp.issuer } },
     },
   });
   const server = await new Promise((resolve) => {
@@ -158,5 +130,5 @@ test("app: a logged-in session gets its token injected into proxied /graphql req
   });
   const resBody = await graphqlRes.text();
   assert.doesNotMatch(resBody, /fake-access-token/, "the token must never come back in a response to the browser");
-  assert.equal(upstream.requests.at(-1).headers.authorization, "Bearer fake-access-token");
+  assert.equal(upstream.requests.at(-1).headers.authorization, "Bearer fake-access-token-for-authorization_code");
 });
