@@ -21,9 +21,9 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const express = require("express");
 const cors = require("cors");
-const { GraphiQL, authRouter, attachAuthFromSession } = require("zendro-graphiql");
 const createApp = require("../../app");
 const { closeServer } = require("../helpers/fakeUpstream");
+const { authRouter, attachAuthFromSession } = require("../helpers/gqsAuth");
 
 const ISSUER_URI = process.env.OAUTH2_ISSUER_URI;
 // Only needed when ISSUER_URI isn't reachable from here directly (e.g. a
@@ -97,30 +97,26 @@ async function performKeycloakLogin(authorizeUrl) {
   return location;
 }
 
-// See the file header - stands in for a real graphql-server's own GraphiQL
-// wiring, the thing this app's /auth/* and /graphql actually proxy to.
+// See the file header - stands in for a real graphql-server's own
+// utils/auth wiring, the thing this app's /auth/* and /graphql actually
+// proxy to (see test/helpers/gqsAuth, a test-only duplicate of it).
 async function startGqsStandin() {
-  const graphiqlOptions = {
-    features: {
-      auth: {
-        enabled: true,
-        clientId: CLIENT_ID,
-        clientSecret: CLIENT_SECRET,
-        issuerUri: ISSUER_URI,
-        issuerInternalUri: ISSUER_INTERNAL_URI,
-        // Never actually used - every request in this test carries the
-        // X-Zendro-Auth-Redirect-Uri override below, but a value is still
-        // required to construct the router.
-        redirectUri: "http://gqs-standin.invalid/auth/callback",
-        allowedRedirectUris: [`${ORIGIN}/*`],
-        sessionSecret: SESSION_SECRET,
-      },
-    },
+  const authConfig = {
+    enabled: true,
+    clientId: CLIENT_ID,
+    clientSecret: CLIENT_SECRET,
+    issuerUri: ISSUER_URI,
+    issuerInternalUri: ISSUER_INTERNAL_URI,
+    // Never actually used - every request in this test carries the
+    // X-Zendro-Auth-Redirect-Uri override below, but a value is still
+    // required to construct the router.
+    redirectUri: "http://gqs-standin.invalid/auth/callback",
+    allowedRedirectUris: [`${ORIGIN}/*`],
+    sessionSecret: SESSION_SECRET,
   };
   const app = express();
-  app.use("/graphiql", GraphiQL(graphiqlOptions));
-  app.use("/auth", authRouter(graphiqlOptions));
-  const attachGraphiqlSession = attachAuthFromSession(graphiqlOptions);
+  app.use("/auth", authRouter(authConfig));
+  const attachGraphiqlSession = attachAuthFromSession(authConfig);
   app.all("/graphql", cors(), attachGraphiqlSession, (req, res) => res.json({ authHeader: req.headers.authorization || null }));
   const server = await new Promise((resolve) => {
     const s = app.listen(0, () => resolve(s));
@@ -144,7 +140,7 @@ test("live login against a real Keycloak, proxied through this app to a gqs stan
     graphqlUrl: `${gqs.url}/graphql`,
     authBaseUrl: `${gqs.url}/auth`,
     redirectUri: REDIRECT_URI,
-    graphiqlOptions: { features: { auth: { enabled: true, proxied: true } } },
+    graphiqlOptions: { features: { auth: true } },
   });
   const port = Number(new URL(REDIRECT_URI).port) || 80;
   const server = await new Promise((resolve, reject) => {

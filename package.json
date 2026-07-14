@@ -2,7 +2,7 @@
   "name": "graphiql-auth",
   "private": true,
   "version": "0.1.0",
-  "description": "Standalone GraphiQL deployment for Zendro's graphql-server, with OAuth2 login and jq/JSONPath meta-query filtering",
+  "description": "Standalone GraphiQL deployment for Zendro's graphql-server - reverse-proxies /auth/* and /meta_query to gqs, which owns login and jq/JSONPath meta-query filtering",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -18,6 +18,7 @@
     "zendro-graphiql": "file:zendro-graphiql"
   },
   "devDependencies": {
-    "nodemon": "^3.1.9"
+    "nodemon": "^3.1.9",
+    "openid-client": "^6.8.4"
   }
 }

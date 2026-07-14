@@ -22,19 +22,19 @@ const ZENDRO_SERVER_URL = process.env.ZENDRO_SERVER_URL;
 const GRAPHQL_URL = ZENDRO_SERVER_URL && `${ZENDRO_SERVER_URL}/graphql`;
 const FILTER_ENABLED = process.env.GRAPHIQL_FILTER_ENABLED === "true";
 const METAQUERY_URL = FILTER_ENABLED && ZENDRO_SERVER_URL ? `${ZENDRO_SERVER_URL}/meta_query` : undefined;
-// Where gqs runs its top-level auth backend (see zendro-graphiql's
-// authRouter()) - a fixed path, independent of gqs's own GraphiQL mount;
-// only worth overriding if something in front of gqs rewrites it.
+// Where gqs runs its top-level auth backend (see gqs's own utils/auth) - a
+// fixed path, independent of gqs's own GraphiQL mount; only worth
+// overriding if something in front of gqs rewrites it.
 const AUTH_PATH = process.env.ZENDRO_AUTH_PATH || "/auth";
 const AUTH_BASE_URL = ZENDRO_SERVER_URL && `${ZENDRO_SERVER_URL}${AUTH_PATH}`;
 
+// This app holds no Keycloak credentials of its own - /auth/* is
+// reverse-proxied to gqs below (see proxyAuthTo in app.js). Only the
+// login/logout UI is rendered here.
 const graphiqlOptions = {
   features: {
-    // proxied: this app holds no Keycloak credentials of its own - /auth/*
-    // is reverse-proxied to gqs below. Only the login/logout UI is
-    // rendered here.
-    auth: { enabled: true, proxied: true },
-    filter: { enabled: Boolean(METAQUERY_URL) },
+    auth: true,
+    filter: Boolean(METAQUERY_URL),
   },
 };
 

@@ -1,6 +1,6 @@
 const express = require("express");
 const cors = require("cors");
-const { GraphiQL } = require("zendro-graphiql");
+const GraphiQL = require("zendro-graphiql");
 
 // This deployment lives on its own origin, separate from the actual
 // graphql-server it talks to (unlike graphql-server's own integration,
@@ -86,12 +86,11 @@ function proxyAuthTo(authBaseUrl, redirectUri) {
  *
  * graphiqlOptions is the same options object passed to GraphiQL(options) - see
  * zendro-graphiql's README. graphqlUrl is required; metaQueryUrl is optional
- * (the filter panel is only useful if graphiqlOptions.features.filter.enabled
- * is also true). authBaseUrl, when set, proxies /auth/* to graphql-server's
- * own auth routes (see zendro-graphiql's features.auth.proxied) instead of
- * this app running its own OAuth2 flow - redirectUri is this app's own
- * `<origin>/auth/callback`, sent so graphql-server knows which origin to run
- * login/logout on behalf of.
+ * (the filter panel is only useful if graphiqlOptions.features.filter is also
+ * true). authBaseUrl, when set, proxies /auth/* to graphql-server's own auth
+ * routes (this app never runs its own OAuth2 flow - it holds no Keycloak
+ * credentials at all) - redirectUri is this app's own `<origin>/auth/callback`,
+ * sent so graphql-server knows which origin to run login/logout on behalf of.
  */
 function createApp({ graphqlUrl, metaQueryUrl, authBaseUrl, redirectUri, graphiqlOptions, maxBodySize }) {
   if (!graphqlUrl) {
