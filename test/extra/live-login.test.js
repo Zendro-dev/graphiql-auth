@@ -19,7 +19,10 @@ const ISSUER_URI = process.env.OAUTH2_ISSUER_URI;
 const CLIENT_ID = process.env.OAUTH2_CLIENT_ID || "zendro_graphiql";
 const CLIENT_SECRET = process.env.OAUTH2_CLIENT_SECRET;
 const SESSION_SECRET = process.env.SESSION_SECRET || "live-test-session-secret";
-const REDIRECT_URI = process.env.OAUTH2_REDIRECT_URI || "http://localhost:7070/auth/callback";
+// Mirrors server.js's own derivation (ORIGIN defaults from PORT) so this
+// test exercises the exact redirect_uri a real run would use.
+const ORIGIN = process.env.ORIGIN || `http://localhost:${process.env.PORT || 7070}`;
+const REDIRECT_URI = `${ORIGIN}/auth/callback`;
 // A user that already exists in the realm - see graphql-server's
 // utils/setup-keycloak.js (createDefaultUser), overridable for other setups.
 const TEST_USERNAME = process.env.TEST_USERNAME || "zendro-admin";
